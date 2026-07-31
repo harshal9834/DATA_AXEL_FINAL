@@ -16,6 +16,7 @@ import { io, Socket } from "socket.io-client";
 import { auth } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { BACKEND_URL } from "../lib/api";
+import { RunAllAgentsWorkflow } from "../components/RunAllAgentsWorkflow";
 
 export const Route = createFileRoute("/app/agents")({
   head: () => ({
@@ -102,6 +103,7 @@ function statusStyle(s: Status) {
 function AgentsPage() {
   const [selected, setSelected] = useState<Agent | null>(null);
   const [showWorkflowModal, setShowWorkflowModal] = useState(false);
+  const [isWorkflowActive, setIsWorkflowActive] = useState(false);
   
   // Real-time State
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
@@ -252,6 +254,7 @@ function AgentsPage() {
         {selected && <AgentModal agent={selected} onClose={() => setSelected(null)} />}
         {showWorkflowModal && <WorkflowModal onClose={() => setShowWorkflowModal(false)} />}
       </AnimatePresence>
+      {isWorkflowActive && <RunAllAgentsWorkflow onClose={() => setIsWorkflowActive(false)} />}
     </div>
   );
 }
@@ -757,7 +760,7 @@ function WorkflowModal({ onClose }: { onClose: () => void }) {
     setLoading(true);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`${BACKEND_URL}/api/workflows`, {
+      const res = await fetch(`${BACKEND_URL}/api/workflow/start`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -771,7 +774,7 @@ function WorkflowModal({ onClose }: { onClose: () => void }) {
         onClose();
         navigate({ to: "/app/workflow/" + data.workflowId });
       } else {
-        toast.error("Failed to start workflow.");
+        toast.error(data.message || "Failed to start workflow.");
       }
     } catch (err) {
       toast.error("Network error");

@@ -138,6 +138,8 @@ console.log('[DEBUG] Voice Ready');
 
 import workflowRoutes from './routes/workflowRoutes';
 import workspaceRoutes from './routes/workspaceRoutes';
+import smartAlertRoutes from './routes/smartAlertRoutes';
+import documentRoutes from './routes/documentRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import resourcesRoutes from './routes/resourcesRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
@@ -158,7 +160,10 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/workflows', workflowRoutes);
+app.use('/api/workflow', workflowRoutes);
 app.use('/api/workspace', workspaceRoutes);
+app.use('/api/smart-alerts', smartAlertRoutes);
+app.use('/api/documents', documentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/resources', resourcesRoutes);
 app.use('/api/analytics', analyticsRoutes);

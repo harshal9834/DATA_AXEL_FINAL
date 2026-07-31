@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { PageHeader } from "../components/app-shell";
 import { toast } from "sonner";
+import { RunAllAgentsWorkflow } from "../components/RunAllAgentsWorkflow";
 
 export const Route = createFileRoute("/app/agents")({
   head: () => ({
@@ -97,6 +98,7 @@ function statusStyle(s: Status) {
 
 function AgentsPage() {
   const [selected, setSelected] = useState<Agent | null>(null);
+  const [isWorkflowActive, setIsWorkflowActive] = useState(false);
 
   return (
     <div>
@@ -121,7 +123,7 @@ function AgentsPage() {
               Deploy a coordinated swarm of research, architecture, documentation and presentation agents. Feed them an idea — get back an implementation-ready project.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <button onClick={() => toast.success("All agents activated")} className="flex items-center gap-2 rounded-xl bg-gradient-brand px-4 py-2.5 text-sm font-semibold text-white shadow-glow">
+              <button onClick={() => setIsWorkflowActive(true)} className="flex items-center gap-2 rounded-xl bg-gradient-brand px-4 py-2.5 text-sm font-semibold text-white shadow-glow">
                 <Rocket className="h-4 w-4" /> Run all agents
               </button>
               <button className="flex items-center gap-2 rounded-xl border border-border/70 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-accent">
@@ -171,6 +173,8 @@ function AgentsPage() {
       <AnimatePresence>
         {selected && <AgentModal agent={selected} onClose={() => setSelected(null)} />}
       </AnimatePresence>
+
+      {isWorkflowActive && <RunAllAgentsWorkflow onClose={() => setIsWorkflowActive(false)} />}
     </div>
   );
 }

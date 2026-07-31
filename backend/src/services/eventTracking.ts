@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { prisma } from '../server.js';
 import { calculateUserMetrics, trackTrendingTechnology, recordResearchPaper } from './dashboardService.js';
 

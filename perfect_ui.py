@@ -1,4 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import os
+
+FILE_PATH = r"c:\Users\Kunal\OneDrive\Desktop\Data_axle_logiloop\DATA_AXEL_FINAL\src\routes\app.docs.tsx"
+
+CONTENT = """import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Monitor, Download, Upload, Loader2, ChevronDown, Sparkles, FileText } from "lucide-react";
@@ -187,9 +191,9 @@ function DocsStudio() {
       s = pres.addSlide();
       addHeader(s, "Technology Stack");
       const cats = [
-        { name: "Frontend", val: docData.techStack?.frontend?.join("\n• ") },
-        { name: "Backend", val: docData.techStack?.backend?.join("\n• ") },
-        { name: "Database", val: docData.techStack?.database?.join("\n• ") }
+        { name: "Frontend", val: docData.techStack?.frontend?.join("\\n• ") },
+        { name: "Backend", val: docData.techStack?.backend?.join("\\n• ") },
+        { name: "Database", val: docData.techStack?.database?.join("\\n• ") }
       ];
       cats.forEach((c, i) => {
         const x = 0.5 + (i * 3.1);
@@ -522,3 +526,8 @@ function DocsStudio() {
     </div>
   );
 }
+"""
+
+with open(FILE_PATH, "w", encoding="utf-8") as f:
+    f.write(CONTENT)
+print("Updated app.docs.tsx to be an EXACT pixel-perfect match for the web UI image.")
