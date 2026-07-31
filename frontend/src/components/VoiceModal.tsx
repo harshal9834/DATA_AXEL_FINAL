@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, X, Loader2, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BACKEND_URL } from '../lib/api';
+import { useLanguage } from '../contexts/LanguageContext';
 
-export type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking' | 'error';
-
+import { useVoiceAI } from '../hooks/useVoiceAI';
 interface Message {
   role: 'user' | 'ai';
   text: string;
@@ -18,18 +18,25 @@ interface VoiceModalProps {
 }
 
 export function VoiceModal({ isOpen, onClose, onConfirmResearch }: VoiceModalProps) {
-  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const { language } = useLanguage();
+  const { state: voiceState, errorMsg, startListening, stopListening, speak, stopAll } = useVoiceAI({
+    language: language,
+    onTranscriptChange: (interim, final) => {
+      setCurrentTranscript(interim);
+    },
+    onUserMessage: (text) => {
+      setCurrentTranscript('');
+      handleUserUtterance(text);
+    }
+  });
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
   
-  const recognitionRef = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
-
   useEffect(() => {
     if (isOpen) {
       setMessages([]);
       setCurrentTranscript('');
-      initSpeech();
       greetUser();
     } else {
       stopAll();
@@ -37,105 +44,21 @@ export function VoiceModal({ isOpen, onClose, onConfirmResearch }: VoiceModalPro
     return () => stopAll();
   }, [isOpen]);
 
-  const stopAll = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    if (synthRef.current) {
-      synthRef.current.cancel();
-    }
-    setVoiceState('idle');
-  };
-
   const greetUser = () => {
-    const greeting = "Hi there! Tell me about the project you want to build.";
-    setMessages([{ role: 'ai', text: greeting }]);
-    speak(greeting, () => {
-      startListening();
-    });
+    const localizedGreeting = language.startsWith('hi') 
+      ? "नमस्ते! आप किस प्रोजेक्ट पर काम करना चाहते हैं?"
+      : "Hi there! Tell me about the project you want to build.";
+    setMessages([{ role: 'ai', text: localizedGreeting }]);
+    speak(localizedGreeting);
   };
 
-  const initSpeech = () => {
-    synthRef.current = window.speechSynthesis;
-
-    // @ts-ignore
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        let interim = '';
-        let final = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript;
-          } else {
-            interim += event.results[i][0].transcript;
-          }
-        }
-
-        setCurrentTranscript(interim);
-
-        if (final) {
-          handleUserUtterance(final);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        if (event.error === 'not-allowed') {
-          setVoiceState('error');
-        }
-      };
-
-      recognition.onend = () => {
-        // Auto-restart if we should be listening but it died
-        if (voiceState === 'listening') {
-          try { recognition.start(); } catch(e){}
-        }
-      };
-
-      recognitionRef.current = recognition;
+  const handleMicClick = () => {
+    if (voiceState === 'SPEAKING' || voiceState === 'THINKING') {
+      startListening(); // Manual barge-in
+    } else if (voiceState === 'LISTENING') {
+      stopListening();
     } else {
-      setVoiceState('error');
-    }
-  };
-
-  const startListening = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-        setVoiceState('listening');
-      } catch (e) {
-        // Already started
-      }
-    }
-  };
-
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-  };
-
-  const speak = (text: string, onEnd?: () => void) => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      
-      // Try to find a good voice
-      const voices = synthRef.current.getVoices();
-      const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Natural')) || voices[0];
-      if (preferredVoice) utterance.voice = preferredVoice;
-      
-      utterance.onstart = () => setVoiceState('speaking');
-      utterance.onend = () => {
-        if (onEnd) onEnd();
-      };
-      synthRef.current.speak(utterance);
+      greetUser();
     }
   };
 
@@ -147,7 +70,8 @@ export function VoiceModal({ isOpen, onClose, onConfirmResearch }: VoiceModalPro
     
     const newHistory = [...messages, { role: 'user' as const, text }];
     setMessages(newHistory);
-    setVoiceState('processing');
+    // State transitions are managed by the useVoiceAI FSM hook
+
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/voice/chat`, {
@@ -160,18 +84,16 @@ export function VoiceModal({ isOpen, onClose, onConfirmResearch }: VoiceModalPro
       
       if (data.confirmResearch && data.idea) {
         setMessages(prev => [...prev, { role: 'ai', text: data.reply }]);
-        speak(data.reply, () => {
-          onConfirmResearch(data.idea);
-          onClose();
-        });
+        speak(data.reply);
+        onConfirmResearch(data.idea);
+        onClose();
       } else {
         setMessages(prev => [...prev, { role: 'ai', text: data.reply }]);
-        speak(data.reply, () => {
-          startListening();
-        });
+        speak(data.reply);
       }
     } catch (err) {
-      setVoiceState('error');
+      // handled by useVoiceAI if synthesis fails, else just generic error
+      console.error(err);
     }
   };
 
@@ -236,33 +158,35 @@ export function VoiceModal({ isOpen, onClose, onConfirmResearch }: VoiceModalPro
           {/* Visualizer Area */}
           <div className="h-40 bg-slate-50 flex flex-col items-center justify-center border-t border-border/50">
             <div className="relative flex h-16 w-16 items-center justify-center mb-2">
-              {voiceState === 'listening' && (
+              {voiceState === 'LISTENING' && (
                 <>
                   <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="absolute inset-0 rounded-full bg-primary/20" />
                   <motion.div animate={{ scale: [1, 1.4, 1] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} className="absolute inset-0 rounded-full bg-primary/10" />
                 </>
               )}
-              {voiceState === 'speaking' && (
+              {voiceState === 'SPEAKING' && (
                 <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} className="absolute inset-0 rounded-full bg-indigo-500/20" />
               )}
-              <div className={`relative flex h-12 w-12 items-center justify-center rounded-full ${
-                voiceState === 'listening' ? 'bg-primary text-white shadow-glow' :
-                voiceState === 'speaking' ? 'bg-indigo-500 text-white shadow-glow' :
-                voiceState === 'processing' ? 'bg-amber-500 text-white' :
+              <button 
+                onClick={handleMicClick}
+                className={`relative flex h-12 w-12 items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
+                voiceState === 'LISTENING' ? 'bg-primary text-white shadow-glow' :
+                voiceState === 'SPEAKING' ? 'bg-indigo-500 text-white shadow-glow' :
+                voiceState === 'THINKING' ? 'bg-amber-500 text-white' :
                 'bg-accent text-primary'
               }`}>
-                {voiceState === 'listening' ? <Mic className="h-5 w-5 animate-pulse" /> :
-                 voiceState === 'speaking' ? <Volume2 className="h-5 w-5" /> :
-                 voiceState === 'processing' ? <Loader2 className="h-5 w-5 animate-spin" /> :
+                {voiceState === 'LISTENING' ? <Mic className="h-5 w-5 animate-pulse" /> :
+                 voiceState === 'SPEAKING' ? <Volume2 className="h-5 w-5" /> :
+                 voiceState === 'THINKING' ? <Loader2 className="h-5 w-5 animate-spin" /> :
                  <Mic className="h-5 w-5 opacity-50" />}
-              </div>
+              </button>
             </div>
             
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {voiceState === 'listening' ? 'Listening...' :
-               voiceState === 'speaking' ? 'AI is speaking...' :
-               voiceState === 'processing' ? 'Thinking...' :
-               voiceState === 'error' ? 'Error. Check Mic permissions.' : 'Ready'}
+              {voiceState === 'LISTENING' ? 'Listening...' :
+               voiceState === 'SPEAKING' ? 'AI is speaking...' :
+               voiceState === 'THINKING' ? 'Thinking...' :
+               voiceState === 'ERROR' ? 'Error. Check Mic permissions.' : 'Ready'}
             </div>
           </div>
         </motion.div>

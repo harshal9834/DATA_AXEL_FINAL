@@ -1,53 +1,66 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Rocket, Loader2, CheckCircle2, Circle, XCircle, Activity, Globe, Database, Cpu, Github, LayoutTemplate, Layers } from 'lucide-react';
+import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { 
+  Mic, Square, VolumeX, Settings, Globe, Loader2, Sparkles, BrainCircuit, 
+  Send, Paperclip, FileCode2, Copy, RefreshCw, Sun, Moon, ChevronDown, LayoutTemplate 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import io, { Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { auth } from '../firebase/firebase';
 import { BACKEND_URL } from '../lib/api';
+import { useVoiceAI } from '../hooks/useVoiceAI';
+import { useLanguage } from '../contexts/LanguageContext';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 export const Route = createFileRoute('/app/voice')({
-  component: VoiceAssistantRoute,
+  component: SplitWorkspaceRoute,
 });
 
 type StatusType = 'Pending' | 'Running' | 'Completed' | 'Failed';
 
-function VoiceAssistantRoute() {
-  const [status, setStatus] = useState<'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING' | 'ERROR'>('IDLE');
+function SplitWorkspaceRoute() {
+  const { language, speechLanguage, setLanguage } = useLanguage();
+  
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', text: string, id: string }[]>([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [isResearchComplete, setIsResearchComplete] = useState(false);
   const [idea, setIdea] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [inputText, setInputText] = useState('');
 
+  // Keep state for backend compatibility so socket events work
   const [workflowStages, setWorkflowStages] = useState<Record<string, StatusType>>({
-    'Research': 'Pending',
-    'Innovation': 'Pending',
-    'Architecture': 'Pending',
-    'Backend': 'Pending',
-    'Frontend': 'Pending',
-    'Documentation': 'Pending',
-    'Analysis': 'Pending'
+    'Research': 'Pending', 'Innovation': 'Pending', 'Architecture': 'Pending',
+    'Backend': 'Pending', 'Frontend': 'Pending', 'Documentation': 'Pending', 'Analysis': 'Pending'
+  });
+  const [mcpStatuses, setMcpStatuses] = useState<Record<string, StatusType>>({
+    'GitHub': 'Pending', 'Context7': 'Pending', 'Firecrawl': 'Pending', 'Tavily': 'Pending', 'Serper': 'Pending'
   });
 
-  const [mcpStatuses, setMcpStatuses] = useState<Record<string, StatusType>>({
-    'GitHub': 'Pending',
-    'Context7': 'Pending',
-    'Firecrawl': 'Pending',
-    'Tavily': 'Pending',
-    'Serper': 'Pending'
+  const { state: status, errorMsg, startListening, stopListening, speak, stopAll } = useVoiceAI({
+    language: speechLanguage,  // Full BCP-47 locale code (e.g. 'hi-IN', 'ta-IN')
+    onTranscriptChange: (interim, final) => {
+      setCurrentTranscript(interim);
+    },
+    onUserMessage: (text) => {
+      setCurrentTranscript('');
+      setMessages(prev => [...prev, { role: 'user', text, id: Math.random().toString() }]);
+      socketRef.current?.emit('voice_message', { text });
+    }
   });
 
   const socketRef = useRef<Socket | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
-  // Ref to track speaking state without stale closures (prevents feedback loop)
-  const isSpeakingRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
 
-  // Load session storage on mount
+  // Handle auto-scroll
+  useEffect(() => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    }
+  }, [messages, currentTranscript]);
+
   useEffect(() => {
     const savedMessages = sessionStorage.getItem('voice_messages');
     if (savedMessages) setMessages(JSON.parse(savedMessages));
@@ -61,7 +74,6 @@ function VoiceAssistantRoute() {
     if (savedResearchComplete) setIsResearchComplete(savedResearchComplete === 'true');
   }, []);
 
-  // Save session storage on change
   useEffect(() => {
     sessionStorage.setItem('voice_messages', JSON.stringify(messages));
     if (idea) sessionStorage.setItem('voice_idea', idea);
@@ -77,40 +89,11 @@ function VoiceAssistantRoute() {
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
     });
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      console.log('Connected to AI Mentor socket');
-      setStatus(prev => prev === 'ERROR' ? 'IDLE' : prev);
-      toast.dismiss('socket_error');
-    });
-    
     socket.on('disconnect', (reason) => {
-      console.warn('Socket disconnected:', reason);
-      if (reason === 'io server disconnect') {
-        socket.connect();
-      }
-      setStatus('ERROR');
-      toast.error('Connection lost. Reconnecting...', { id: 'socket_error' });
-    });
-
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err);
-      setStatus('ERROR');
-    });
-    
-    socket.on('reconnect_attempt', (attempt) => {
-      toast.loading(`Reconnecting... (Attempt ${attempt})`, { id: 'socket_error' });
-    });
-
-    socket.on('ai_status', (data: { status: string }) => {
-      if (data.status === 'Thinking...') setStatus('THINKING');
-      if (data.status === 'Listening...') setStatus('LISTENING');
-      if (data.status === 'Researching' || data.status === 'Innovating' || data.status === 'Designing' || data.status === 'Completed' || data.status === 'ERROR') {
-         // Just visual updates, handled in other panels
-      }
+      if (reason === 'io server disconnect') socket.connect();
     });
 
     socket.on('workflow_update', (data: { stage: string, status: StatusType }) => {
@@ -124,14 +107,10 @@ function VoiceAssistantRoute() {
     socket.on('voice_reply', (data: { reply: string, confirmResearch: boolean, workflowId?: string }) => {
       setMessages(prev => [...prev, { role: 'assistant', text: data.reply, id: Math.random().toString() }]);
       speak(data.reply);
-      if (data.confirmResearch) {
-        setIsResearchComplete(true);
-      }
+      if (data.confirmResearch) setIsResearchComplete(true);
       if (data.workflowId) {
-        // Show workspace button with the workflow ID
         sessionStorage.setItem('voice_workspace_id', data.workflowId);
-        const savedIdea2 = sessionStorage.getItem('voice_idea');
-        if (!savedIdea2) sessionStorage.setItem('voice_idea', data.workflowId);
+        if (!sessionStorage.getItem('voice_idea')) sessionStorage.setItem('voice_idea', data.workflowId);
       }
     });
 
@@ -139,17 +118,12 @@ function VoiceAssistantRoute() {
       setIdea(data.idea);
     });
 
-    initSpeech();
-
     return () => {
       socket.off('connect');
       socket.off('disconnect');
-      socket.off('connect_error');
-      socket.off('reconnect_attempt');
-      socket.off('ai_status');
-      socket.off('voice_reply');
       socket.off('workflow_update');
       socket.off('mcp_status');
+      socket.off('voice_reply');
       socket.off('research_complete');
       socket.disconnect();
       stopAll();
@@ -157,375 +131,336 @@ function VoiceAssistantRoute() {
   }, []);
 
   useEffect(() => {
-    if (transcriptRef.current) {
-      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    if (errorMsg) toast.error(errorMsg);
+  }, [errorMsg]);
+
+  useEffect(() => {
+    if (isResearchComplete) {
+      const cachedWorkflowId = sessionStorage.getItem('voice_workspace_id');
+      if (cachedWorkflowId) {
+        toast.success("Workspace ready!", { position: 'top-center' });
+        // Can add a button to navigate, or just let user click the generated link if any
+      }
     }
-  }, [messages, currentTranscript]);
+  }, [isResearchComplete]);
 
-  const initSpeech = () => {
-    synthRef.current = window.speechSynthesis;
-    if (synthRef.current.onvoiceschanged !== undefined) {
-      synthRef.current.onvoiceschanged = () => synthRef.current?.getVoices();
-    }
-
-    // @ts-ignore
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        let interim = '';
-        let final = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript;
-          } else {
-            interim += event.results[i][0].transcript;
-          }
-        }
-
-        // Interruption Logic
-        if ((interim.trim() || final.trim()) && isSpeakingRef.current) {
-           console.log('User interruption detected!');
-           isSpeakingRef.current = false;
-           if (synthRef.current) synthRef.current.cancel();
-           socketRef.current?.emit('voice_interrupt');
-           setStatus('LISTENING');
-        }
-
-        setCurrentTranscript(interim);
-
-        if (final) {
-          handleUserUtterance(final);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        if (event.error === 'not-allowed') {
-          setStatus('ERROR');
-          toast.error("Microphone access denied. Please allow permissions.");
-        }
-      };
-
-      recognition.onend = () => {
-        // Use ref (not stale state) to prevent restarting while the AI is speaking
-        if (!isSpeakingRef.current) {
-          try { recognition.start(); } catch(e){}
-        }
-      };
-
-      recognitionRef.current = recognition;
+  const handleMicClick = () => {
+    if (status === 'IDLE' || status === 'ERROR') {
+      const greeting = language === 'hi' ? "नमस्ते, मैं सुन रहा हूँ।" : "Hi! I'm listening.";
+      speak(greeting);
+    } else if (status === 'SPEAKING' || status === 'THINKING') {
+      startListening();
     } else {
-      toast.error("Speech Recognition is not supported in this browser.", { duration: 10000 });
-      setStatus('ERROR');
+      stopListening();
     }
   };
 
-  const startListening = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-        setStatus('LISTENING');
-        if (messages.length === 0) {
-          socketRef.current?.emit('voice_message', { text: "Hello!" });
-        }
-      } catch (e) {
+  const handleTextSubmit = () => {
+    if (!inputText.trim()) return;
+    setMessages(prev => [...prev, { role: 'user', text: inputText, id: Math.random().toString() }]);
+    socketRef.current?.emit('voice_message', { text: inputText });
+    setInputText('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleTextSubmit();
+    }
+  };
+
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputText(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+  };
+
+  const getOrbVariants = (): any => {
+    return {
+      idle: {
+        scale: [1, 1.05, 1],
+        boxShadow: ["0px 0px 40px rgba(59,130,246,0.3)", "0px 0px 80px rgba(59,130,246,0.5)", "0px 0px 40px rgba(59,130,246,0.3)"],
+        transition: { repeat: Infinity, duration: 4, ease: "easeInOut" }
+      },
+      listening: {
+        scale: [1, 1.2, 1],
+        boxShadow: ["0px 0px 60px rgba(59,130,246,0.6)", "0px 0px 120px rgba(59,130,246,0.8)", "0px 0px 60px rgba(59,130,246,0.6)"],
+        transition: { repeat: Infinity, duration: 2, ease: "easeInOut" }
+      },
+      thinking: {
+        rotate: [0, 360],
+        scale: [1.1, 1.15, 1.1],
+        boxShadow: ["0px 0px 80px rgba(168,85,247,0.6)", "0px 0px 100px rgba(236,72,153,0.6)", "0px 0px 80px rgba(168,85,247,0.6)"],
+        transition: { rotate: { repeat: Infinity, duration: 8, ease: "linear" }, scale: { repeat: Infinity, duration: 2 } }
+      },
+      speaking: {
+        scale: [1.1, 1.4, 1.15, 1.3, 1.1],
+        boxShadow: ["0px 0px 80px rgba(16,185,129,0.5)", "0px 0px 140px rgba(16,185,129,0.8)", "0px 0px 80px rgba(16,185,129,0.5)"],
+        transition: { repeat: Infinity, duration: 1.5, ease: "easeInOut" }
       }
+    };
+  };
+
+  const getOrbGradient = () => {
+    switch(status) {
+      case 'LISTENING': return 'from-[#3B82F6] to-[#60A5FA]';
+      case 'THINKING': return 'from-[#A855F7] to-[#EC4899]';
+      case 'SPEAKING': return 'from-[#10B981] to-[#34D399]';
+      default: return 'from-[#1E3A8A] to-[#3B82F6]'; // IDLE
     }
   };
 
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
+  // Format AI Document Cards
+  const formatDocumentCard = (text: string) => {
+    return (
+      <div className="w-full bg-[#18181B] border border-[#27272A] rounded-xl shadow-lg overflow-hidden group">
+        <div className="bg-[#27272A]/50 border-b border-[#3F3F46]/50 px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileCode2 className="h-4 w-4 text-[#A1A1AA]" />
+            <span className="text-xs font-semibold text-[#E4E4E7] tracking-wide uppercase">AI Artifact</span>
+          </div>
+          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button className="flex items-center gap-1 text-[11px] font-medium text-[#A1A1AA] hover:text-white transition bg-[#3F3F46]/50 px-2 py-1 rounded">
+              <Copy className="h-3 w-3" /> Copy
+            </button>
+            <button className="flex items-center gap-1 text-[11px] font-medium text-[#A1A1AA] hover:text-white transition bg-[#3F3F46]/50 px-2 py-1 rounded">
+              <RefreshCw className="h-3 w-3" /> Regenerate
+            </button>
+          </div>
+        </div>
+        <div className="p-5 text-[14px] text-[#E4E4E7] leading-relaxed whitespace-pre-wrap font-mono">
+          {text}
+        </div>
+      </div>
+    );
   };
 
-  const stopAll = () => {
-    stopListening();
-    if (synthRef.current) {
-      synthRef.current.cancel();
-    }
-    setStatus('IDLE');
-  };
-
-  const speak = (text: string) => {
-    if (synthRef.current) {
-      // CRITICAL: Set speaking ref, and make sure we are listening to catch interruptions
-      isSpeakingRef.current = true;
-      synthRef.current.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voices = synthRef.current.getVoices();
-      const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Natural')) || voices[0];
-      if (preferredVoice) utterance.voice = preferredVoice;
-      
-      setStatus('SPEAKING');
-      
-      // Start listening to detect interruption while AI is speaking
-      try { recognitionRef.current?.start(); } catch(e){}
-
-      utterance.onend = () => {
-        // Clear speaking ref only if it hasn't been interrupted
-        if (isSpeakingRef.current) {
-          isSpeakingRef.current = false;
-          setStatus('IDLE');
-          setTimeout(() => {
-            startListening();
-          }, 500); // Small delay to let synthesis completely release audio stream
-        }
-      };
-      synthRef.current.speak(utterance);
-    }
-  };
-
-  const handleUserUtterance = (text: string) => {
-    if (!text || !text.trim() || text.trim().length < 2) return;
-    
-    stopListening();
-    setCurrentTranscript('');
-    
-    setMessages(prev => [...prev, { role: 'user', text, id: Math.random().toString() }]);
-    setStatus('THINKING');
-
-    socketRef.current?.emit('voice_message', { text });
-  };
-
-  const handleGenerateProject = async () => {
-    // If workspace is already created from voice session, navigate directly
-    const cachedWorkflowId = sessionStorage.getItem('voice_workspace_id');
-    if (cachedWorkflowId) {
-      navigate({ to: `/app/workspace/${cachedWorkflowId}` });
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`${BACKEND_URL}/api/workflows`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ idea })
-      });
-      const data = await res.json();
-      if (res.ok && data.workflowId) {
-        toast.success("Workspace launched!");
-        navigate({ to: `/app/workspace/${data.workflowId}` });
-      } else {
-        toast.error("Failed to start workspace.");
-      }
-    } catch (err) {
-      toast.error("Network error");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const renderStatusIcon = (st: StatusType) => {
-    switch (st) {
-      case 'Pending': return <Circle className="h-4 w-4 text-slate-300" />;
-      case 'Running': return <Loader2 className="h-4 w-4 text-amber-500 animate-spin" />;
-      case 'Completed': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case 'Failed': return <XCircle className="h-4 w-4 text-red-500" />;
-    }
+  const formatUserMessage = (text: string) => {
+    return (
+      <div className="w-full flex justify-end">
+        <div className="max-w-[85%] bg-[#27272A] border border-[#3F3F46] rounded-2xl rounded-tr-sm px-5 py-3 shadow-sm">
+          <div className="text-[15px] text-[#E4E4E7] leading-relaxed font-sans">
+            {text}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-background relative overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full bg-[#09090B] text-white overflow-hidden font-sans selection:bg-[#3B82F6]/30">
       
-      {/* Left Panel: AI Interaction */}
-      <div className="flex-1 flex flex-col border-r border-border/60 relative">
-        
-        {/* Status Header */}
-        <div className="h-20 shrink-0 border-b border-border/60 bg-card/50 flex flex-col items-center justify-center relative">
-          <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">AI Mentor Status</h2>
-          <div className="flex gap-4 items-center">
-            <div className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
-              status === 'LISTENING' ? 'bg-primary/20 text-primary border border-primary/30' :
-              status === 'THINKING' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' :
-              status === 'SPEAKING' ? 'bg-green-500/20 text-green-500 border border-green-500/30' :
-              'bg-slate-500/20 text-slate-500 border border-slate-500/30'
-            }`}>
-              {status === 'LISTENING' && <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
-              {status === 'THINKING' && <Loader2 className="h-3 w-3 animate-spin" />}
-              {status === 'SPEAKING' && <div className="flex gap-0.5 items-center">
-                  <motion.div animate={{ height: [4, 12, 4] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-0.5 bg-green-500 rounded-full" />
-                  <motion.div animate={{ height: [8, 16, 8] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-0.5 bg-green-500 rounded-full" />
-                  <motion.div animate={{ height: [4, 12, 4] }} transition={{ repeat: Infinity, duration: 0.5 }} className="w-0.5 bg-green-500 rounded-full" />
-              </div>}
-              {status}
-            </div>
+      {/* Top Navigation Bar */}
+      <header className="shrink-0 h-14 flex items-center justify-between px-6 bg-[#09090B] border-b border-[#27272A] z-20">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <BrainCircuit className="h-5 w-5 text-[#3B82F6]" />
+            <h1 className="font-semibold text-sm tracking-wide text-[#E4E4E7]">AI Mentor OS</h1>
+          </div>
+          <div className="h-4 w-[1px] bg-[#27272A] mx-2"></div>
+          <div className="flex items-center gap-2 text-xs font-medium text-[#A1A1AA] cursor-pointer hover:text-white transition">
+            Project Alpha <ChevronDown className="h-3 w-3" />
           </div>
         </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#18181B] border border-[#27272A] text-xs font-medium text-[#A1A1AA]">
+            <Sparkles className="h-3.5 w-3.5 text-[#A855F7]" /> GPT-4o
+          </div>
+          <LanguageSwitcher />
+          <button className="text-[#A1A1AA] hover:text-white transition">
+            <Moon className="h-4 w-4" />
+          </button>
+          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#3B82F6] to-[#A855F7] flex items-center justify-center text-white font-bold text-[10px] shadow-sm cursor-pointer hover:shadow-md transition">
+            {auth.currentUser?.displayName?.charAt(0).toUpperCase() || 'U'}
+          </div>
+        </div>
+      </header>
 
-        {/* Conversation History */}
-        <div className="flex-1 overflow-hidden flex justify-center p-6 bg-slate-50/50">
-          <div ref={transcriptRef} className="w-full max-w-3xl overflow-y-auto space-y-6 pb-20">
+      {/* Main Split Layout */}
+      <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
+        
+        {/* LEFT PANEL: Conversation & Workspace (50%) */}
+        <div className="w-full lg:w-1/2 h-full flex flex-col border-b lg:border-b-0 lg:border-r border-[#27272A] bg-[#09090B] relative">
+          
+          {/* Document / Chat Area */}
+          <div className="flex-1 overflow-y-auto px-6 py-8 pb-32 scroll-smooth" ref={transcriptRef}>
+            <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
+              
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                  <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-                    <Mic className="h-10 w-10 text-primary" />
-                  </div>
-                  <p className="text-xl font-medium text-foreground">Click the microphone to start talking.</p>
-                  <p className="text-sm mt-2 text-center max-w-md">Your AI Mentor will guide you through the process.</p>
+                <div className="flex flex-col items-center justify-center h-[50vh] opacity-60">
+                  <LayoutTemplate className="h-12 w-12 text-[#3F3F46] mb-4" />
+                  <p className="text-[#A1A1AA] text-sm">Conversation and documents will appear here.</p>
                 </div>
               ) : (
                 messages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`max-w-[85%] rounded-3xl p-5 ${
-                      msg.role === 'user' 
-                        ? 'bg-primary text-white rounded-br-sm shadow-glow'
-                        : 'bg-white text-foreground border border-border/50 rounded-bl-sm shadow-lg'
-                    }`}>
-                      <div className="text-[10px] font-bold uppercase tracking-wider mb-2 opacity-70">
-                        {msg.role === 'user' ? 'You' : 'AI Mentor'}
-                      </div>
-                      <div className="text-[15px] leading-relaxed">
-                        {msg.text}
-                      </div>
-                    </motion.div>
+                  <div key={msg.id} className="w-full">
+                    {msg.role === 'user' ? formatUserMessage(msg.text) : (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+                        {formatDocumentCard(msg.text)}
+                      </motion.div>
+                    )}
                   </div>
                 ))
               )}
-              
-              {/* Live Transcript Bubble */}
-              {currentTranscript && (
-                <div className="flex justify-end">
-                  <motion.div 
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    className="max-w-[85%] rounded-3xl p-5 bg-primary/20 text-primary rounded-br-sm">
-                    <p className="text-[15px] leading-relaxed font-medium animate-pulse">{currentTranscript}...</p>
+
+              {/* Streaming state on the left panel for visual continuity */}
+              <AnimatePresence>
+                {(status === 'THINKING' || currentTranscript) && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full mt-2">
+                    <div className="w-full bg-[#18181B] border border-[#27272A] border-dashed rounded-xl p-4 flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-[#A1A1AA] uppercase tracking-wide">
+                        {status === 'THINKING' ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin text-[#A855F7]" /> Synthesizing Artifact...</>
+                        ) : (
+                          <><Mic className="h-3.5 w-3.5 animate-pulse text-[#3B82F6]" /> Listening...</>
+                        )}
+                      </div>
+                      {currentTranscript && (
+                        <p className="text-[14px] text-[#E4E4E7] font-sans leading-relaxed">
+                          {currentTranscript}
+                        </p>
+                      )}
+                    </div>
                   </motion.div>
-                </div>
-              )}
+                )}
+              </AnimatePresence>
+
+            </div>
           </div>
+
+          {/* Sticky Cursor-style Composer */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl bg-[#18181B] border border-[#27272A] rounded-xl shadow-2xl overflow-hidden">
+            <div className="flex flex-col p-1">
+              <div className="flex items-end px-2 py-2 gap-2">
+                <button className="p-2.5 text-[#A1A1AA] hover:text-white hover:bg-[#27272A] rounded-lg transition mb-0.5">
+                  <Paperclip className="h-4 w-4" />
+                </button>
+                <textarea
+                  ref={textareaRef}
+                  value={inputText}
+                  onChange={handleInput}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask a question or request a feature..."
+                  className="flex-1 bg-transparent resize-none outline-none py-2.5 px-1 text-[14.5px] placeholder:text-[#71717A] text-[#E4E4E7] max-h-[300px] leading-relaxed font-sans"
+                  rows={1}
+                />
+                <button 
+                  onClick={handleTextSubmit}
+                  disabled={!inputText.trim()}
+                  className={`p-2.5 rounded-lg transition mb-0.5 flex items-center justify-center ${inputText.trim() ? 'bg-[#E4E4E7] text-black hover:bg-white' : 'bg-[#27272A] text-[#71717A]'}`}
+                >
+                  <Send className="h-4 w-4 ml-0.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+          
         </div>
 
-        {/* Voice Controls */}
-        <div className="h-28 shrink-0 bg-white border-t border-border/60 flex items-center justify-center gap-8 relative shadow-[0_-10px_40px_rgba(0,0,0,0.02)]">
-          <button 
-            onClick={stopAll}
-            className="absolute left-8 px-5 py-2 rounded-xl border border-red-500/30 text-red-500 text-sm font-bold hover:bg-red-50 transition"
-          >
-            End Chat
-          </button>
+        {/* RIGHT PANEL: Live AI Voice Agent (50%) */}
+        <div className="w-full lg:w-1/2 h-full relative flex flex-col items-center justify-center bg-[#030712] overflow-hidden">
           
-          <div className="relative">
+          {/* Background Ambient Glows */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-[#3B82F6] rounded-full mix-blend-screen filter blur-[128px] opacity-10 animate-pulse-slow"></div>
+            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#A855F7] rounded-full mix-blend-screen filter blur-[128px] opacity-10 animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+          </div>
+
+          {/* Animated AI Orb */}
+          <div className="relative flex items-center justify-center h-[280px] w-[280px] z-10 mb-8">
             <AnimatePresence>
-              {(status === 'LISTENING' || status === 'SPEAKING') && (
+              {status === 'LISTENING' && (
                 <>
-                  <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="absolute inset-0 rounded-full bg-primary/20 blur-xl" />
-                  <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} className="absolute inset-0 rounded-full bg-primary/10 blur-xl" />
+                  <motion.div 
+                    initial={{ scale: 1, opacity: 0.8 }}
+                    animate={{ scale: 2.2, opacity: 0 }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeOut" }}
+                    className="absolute inset-0 rounded-full border border-[#3B82F6]/50"
+                  />
+                  <motion.div 
+                    initial={{ scale: 1, opacity: 0.8 }}
+                    animate={{ scale: 2.2, opacity: 0 }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeOut", delay: 0.6 }}
+                    className="absolute inset-0 rounded-full border border-[#3B82F6]/30"
+                  />
                 </>
               )}
             </AnimatePresence>
-            <button
-              onClick={status === 'IDLE' || status === 'ERROR' ? startListening : stopListening}
-              className={`relative grid h-16 w-16 place-items-center rounded-full transition-all duration-300 shadow-xl ${
-                status === 'LISTENING' ? 'bg-primary scale-110' : 
-                status === 'SPEAKING' ? 'bg-green-500 scale-110' :
-                'bg-white border-2 border-primary/20 hover:border-primary/50 text-primary'
+
+            <motion.div
+              variants={getOrbVariants()}
+              initial="idle"
+              animate={status.toLowerCase()}
+              className={`relative h-[180px] w-[180px] rounded-full bg-gradient-to-tr ${getOrbGradient()} flex items-center justify-center shadow-2xl`}
+            >
+              <div className="absolute inset-0 rounded-full bg-white/10 backdrop-blur-sm shadow-inner mix-blend-overlay"></div>
+            </motion.div>
+          </div>
+
+          {/* Live Transcript / Status */}
+          <div className="w-full max-w-md px-6 text-center z-10 h-24 flex flex-col items-center justify-start">
+            <motion.div 
+              key={status === 'LISTENING' ? currentTranscript : status}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`text-xl font-light tracking-wide leading-relaxed ${
+                status === 'LISTENING' ? 'text-white' : 
+                status === 'THINKING' ? 'text-white/60 animate-pulse' : 
+                status === 'IDLE' ? 'text-white/40' : 'text-white/90'
               }`}
             >
-              {status === 'LISTENING' || status === 'SPEAKING' ? (
-                <Mic className="h-6 w-6 text-white animate-pulse" />
-              ) : (
-                <MicOff className="h-6 w-6" />
-              )}
-            </button>
+              {status === 'LISTENING' ? (currentTranscript || "Listening...") :
+               status === 'THINKING' ? "Thinking..." :
+               status === 'SPEAKING' ? "Speaking..." : "Ready"}
+            </motion.div>
+            
+            <div className="mt-3 text-[10px] font-bold tracking-widest uppercase text-white/30">
+              {status}
+            </div>
           </div>
 
-          <AnimatePresence>
-            {isResearchComplete && (
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="absolute right-8"
-              >
-                <button 
-                  onClick={handleGenerateProject}
-                  disabled={isGenerating}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-brand text-white shadow-glow hover:scale-105 transition disabled:opacity-50 font-bold"
-                >
-                  {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Rocket className="h-5 w-5" />}
-                  {isGenerating ? "Generating..." : "Generate App"}
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* Right Panel: Workflow and MCP Status */}
-      <div className="w-[380px] bg-slate-50/80 flex flex-col border-l border-border/60">
-        <div className="p-6 border-b border-border/60 bg-white shadow-[0_5px_20px_rgba(0,0,0,0.02)] z-10">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Layers className="h-5 w-5 text-primary" />
-            Project Workflow
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1">Real-time generation progress</p>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          
-          {/* Timeline */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Stages</h3>
-            <div className="relative pl-3 space-y-6">
-              {/* Vertical line connecting timeline nodes */}
-              <div className="absolute left-4 top-2 bottom-4 w-0.5 bg-border/80"></div>
+          {/* Floating Bottom Controls */}
+          <div className="absolute bottom-10 z-20 w-full flex justify-center">
+            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
               
-              {Object.entries(workflowStages).map(([stage, stageStatus], idx) => (
-                <div key={stage} className="relative flex items-center gap-4 z-10">
-                  <div className="bg-white rounded-full">
-                    {renderStatusIcon(stageStatus)}
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-bold ${stageStatus === 'Running' ? 'text-amber-600' : stageStatus === 'Completed' ? 'text-slate-800' : 'text-slate-500'}`}>
-                      {stage}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+              <button 
+                onClick={handleMicClick}
+                className={`flex items-center justify-center h-12 w-12 rounded-full transition-all duration-300 ${
+                  status === 'LISTENING' || status === 'SPEAKING' || status === 'THINKING'
+                    ? 'bg-white text-black' 
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+              
+              <button 
+                onClick={stopAll}
+                className="flex items-center justify-center h-12 w-12 rounded-full bg-white/5 text-white hover:bg-[#EF4444]/20 hover:text-[#EF4444] transition-all duration-300"
+              >
+                <Square className="h-4 w-4 fill-current" />
+              </button>
 
-          <hr className="border-border/60" />
+              <div className="w-[1px] h-6 bg-white/20 mx-1"></div>
 
-          {/* MCP Grid */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Cpu className="h-4 w-4" /> Live MCP Services
-            </h3>
-            <div className="grid gap-3">
-              {Object.entries(mcpStatuses).map(([provider, mcpStatus]) => (
-                <div key={provider} className="flex items-center justify-between p-3 rounded-xl bg-white border border-border/50 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    {provider === 'GitHub' && <Activity className="h-4 w-4 text-slate-500" />}
-                    {provider === 'Context7' && <Database className="h-4 w-4 text-slate-500" />}
-                    {provider === 'Firecrawl' && <Globe className="h-4 w-4 text-slate-500" />}
-                    {provider === 'Tavily' && <Globe className="h-4 w-4 text-slate-500" />}
-                    {provider === 'Serper' && <Globe className="h-4 w-4 text-slate-500" />}
-                    {provider}
-                  </div>
-                  {renderStatusIcon(mcpStatus)}
-                </div>
-              ))}
+              <button className="flex items-center justify-center h-10 w-10 rounded-full bg-transparent text-white/60 hover:bg-white/10 hover:text-white transition-all duration-300">
+                <VolumeX className="h-4 w-4" />
+              </button>
+              <button className="flex items-center justify-center h-10 w-10 rounded-full bg-transparent text-white/60 hover:bg-white/10 hover:text-white transition-all duration-300">
+                <Globe className="h-4 w-4" />
+              </button>
+              <button className="flex items-center justify-center h-10 w-10 rounded-full bg-transparent text-white/60 hover:bg-white/10 hover:text-white transition-all duration-300">
+                <Settings className="h-4 w-4" />
+              </button>
+
             </div>
           </div>
 
         </div>
-      </div>
 
+      </div>
     </div>
   );
 }

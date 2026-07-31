@@ -1,73 +1,127 @@
-import React from 'react';
+/**
+ * LanguageSwitcher.tsx
+ * Premium animated language selector for the AI Mentor OS.
+ * Integrates with Google Translate via LanguageContext.
+ * All markup uses notranslate to prevent recursive translation.
+ */
+
+import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from './ui/dropdown-menu';
-import { Globe, Check } from 'lucide-react';
+import { Globe, Check, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const LanguageSwitcher: React.FC = () => {
   const { language, setLanguage, availableLanguages } = useLanguage();
-  
-  const currentLang = availableLanguages.find(l => l.code === language) || availableLanguages[0];
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const currentLang = availableLanguages.find(l => l.code === language) ?? availableLanguages[0];
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  const handleSelect = (code: string) => {
+    setLanguage(code);
+    setOpen(false);
+  };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="relative flex items-center gap-2 rounded-xl border border-border/60 bg-white/80 dark:bg-black/80 px-3 py-2 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-4 focus:ring-primary/10 notranslate">
-          <Globe className="h-4 w-4 text-primary" />
-          <span className="hidden md:inline-block">{currentLang.nativeName}</span>
-        </button>
-      </DropdownMenuTrigger>
-      
-      <DropdownMenuContent align="end" className="w-[280px] p-2 bg-background/95 backdrop-blur-xl border-border/60 shadow-xl rounded-xl mt-2 overflow-hidden notranslate">
-        <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold px-2 pb-2">
-          Select Language
-        </DropdownMenuLabel>
-        <div className="grid grid-cols-1 gap-1 max-h-[300px] overflow-y-auto pr-1">
-          {availableLanguages.map((lang) => {
-            const isActive = lang.code === language;
-            return (
-              <DropdownMenuItem
-                key={lang.code}
-                onClick={() => setLanguage(lang.code)}
-                className={`relative flex items-center gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors cursor-pointer group ${
-                  isActive 
-                    ? 'bg-primary/10 text-primary font-medium' 
-                    : 'hover:bg-accent hover:text-accent-foreground text-foreground'
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeLang"
-                    className="absolute inset-0 bg-primary/10 rounded-lg -z-10"
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <span className="text-xl shadow-sm rounded-sm overflow-hidden">{lang.flag}</span>
-                <div className="flex flex-col items-start leading-tight flex-1">
-                  <span className="font-semibold">{lang.nativeName}</span>
-                  <span className="text-[10px] opacity-70 group-hover:opacity-100 transition-opacity">{lang.name}</span>
-                </div>
-                {isActive && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-primary"
-                  >
-                    <Check className="h-3 w-3" />
-                  </motion.div>
-                )}
-              </DropdownMenuItem>
-            );
-          })}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="relative notranslate" ref={ref}>
+      {/* Trigger button */}
+      <button
+        aria-label={`Language: ${currentLang.name}. Click to change.`}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen(prev => !prev)}
+        className="notranslate relative flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-2 text-sm font-medium text-white/80 hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+      >
+        <Globe className="notranslate h-4 w-4 text-blue-400 shrink-0" />
+        <span className="hidden sm:block leading-none">{currentLang.nativeName}</span>
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="notranslate"
+        >
+          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+        </motion.div>
+      </button>
+
+      {/* Dropdown */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="listbox"
+            aria-label="Select language"
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.97 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="notranslate absolute right-0 top-full mt-2 w-[230px] rounded-2xl border border-white/10 bg-[#0F172A]/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[9999]"
+            style={{ boxShadow: '0 24px 60px -12px rgba(0,0,0,0.6)' }}
+          >
+            <div className="p-2">
+              <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-widest text-white/30">
+                Select Language
+              </p>
+              <div className="space-y-0.5 max-h-[320px] overflow-y-auto scrollbar-thin pr-0.5">
+                {availableLanguages.map(lang => {
+                  const isActive = lang.code === language;
+                  return (
+                    <button
+                      key={lang.code}
+                      role="option"
+                      aria-selected={isActive}
+                      onClick={() => handleSelect(lang.code)}
+                      className={`notranslate w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 text-left group ${
+                        isActive
+                          ? 'bg-blue-500/20 text-white'
+                          : 'text-white/70 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="notranslate text-xl leading-none shrink-0">{lang.flag}</span>
+                      <div className="notranslate flex flex-col min-w-0">
+                        <span className="notranslate font-semibold text-sm leading-tight">{lang.nativeName}</span>
+                        <span className="notranslate text-[10px] opacity-50 group-hover:opacity-70 transition-opacity">{lang.name}</span>
+                      </div>
+                      <AnimatePresence>
+                        {isActive && (
+                          <motion.div
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            className="notranslate ml-auto flex items-center justify-center h-5 w-5 rounded-full bg-blue-500/30"
+                          >
+                            <Check className="notranslate h-3 w-3 text-blue-400" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
+
+export default LanguageSwitcher;

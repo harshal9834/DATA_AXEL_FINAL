@@ -7,6 +7,10 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 
 export default defineConfig({
+  server: {
+    port: 3002,
+    strictPort: true,
+  },
   plugins: [
     tanstackStart({
       server: { entry: "server" }

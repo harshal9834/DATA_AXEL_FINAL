@@ -34,6 +34,8 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import { languageMiddleware } from './middleware/languageMiddleware';
+import { translateError } from './utils/errorTranslator';
 
 process.on('uncaughtException', (err) => {
   console.error('\n[FATAL] uncaughtException:', err.stack || err);
@@ -80,6 +82,7 @@ console.log('[DEBUG] Socket Ready');
 
 app.use(cors());
 app.use(express.json());
+app.use(languageMiddleware);
 
 // Detailed Request Logging Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -127,10 +130,22 @@ app.use('/api/workflows', workflowRoutes);
 app.use('/api/workspace', workspaceRoutes);
 
 // Global Error Handler
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('\n[Exception] Unhandled error caught in global handler:');
   console.error(err.stack || err);
-  res.status(500).json({ success: false, message: 'Internal Server Error', stack: err.stack });
+  
+  const rawMessage = err.message || 'Internal Server Error';
+  const locale = req.locale || 'en';
+  
+  // Do not block the event loop for translation if possible, or await it
+  const translatedMessage = await translateError(rawMessage, locale);
+  
+  res.status(500).json({ 
+    success: false, 
+    message: translatedMessage, 
+    originalMessage: rawMessage, // always good to have for dev debugging
+    stack: err.stack 
+  });
 });
 
 httpServer.listen(port, () => {

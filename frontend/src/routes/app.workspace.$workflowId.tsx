@@ -11,7 +11,9 @@ import {
   ClipboardList, Users, Map, Target, ArrowLeft, Bot, Cpu,
   RefreshCw,
 } from "lucide-react";
-import { BACKEND_URL, API_BASE } from "../lib/api";
+import { BACKEND_URL, API_BASE } from '../lib/api';
+import { useVoiceAI } from '../hooks/useVoiceAI';
+import { useLanguage } from '../contexts/LanguageContext';
 import { auth } from "../firebase/firebase";
 
 export const Route = createFileRoute("/app/workspace/$workflowId")({
@@ -129,20 +131,26 @@ function WorkspacePage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [mentorStatus, setMentorStatus] = useState<"idle"|"thinking"|"speaking"|"listening">("idle");
-  const [activeTab, setActiveTab] = useState("overview");
-  const [ws, setWs] = useState<Record<string, any>>({});
-  const [agents, setAgents] = useState<AgentStatus[]>([]);
+  const [ws, setWs] = useState<any>(null);
+  const [agents, setAgents] = useState<any[]>([]);
   const [progress, setProgress] = useState(0);
-  const [phase, setPhase] = useState("Initializing…");
+  const [phase, setPhase] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
+  const { language } = useLanguage();
+  const { state: voiceState, startListening, stopListening, speak, stopAll } = useVoiceAI({
+    language: language,
+    onUserMessage: (text) => {
+      sendMentor(text);
+    }
+  });
+
+  // Map hook states to the expected mentorStatus
+  const mentorStatus = voiceState.toLowerCase();
+  const isListening = voiceState === 'LISTENING';
 
   const voiceSocket = useRef<Socket | null>(null);
   const mainSocket = useRef<Socket | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
-  const isSpeakingRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const addMsg = (role: "user"|"assistant", text: string) =>
@@ -174,7 +182,7 @@ function WorkspacePage() {
     mainSocket.current = s;
     s.on("workspace_document_ready", ({ workflowId: wId, tabName, content }: any) => {
       if (wId !== workflowId) return;
-      setWs(p => ({ ...p, [tabName]: content }));
+      setWs((p: any) => ({ ...p, [tabName]: content }));
       toast.success(`✅ ${tabName} ready`, { duration: 2000 });
     });
     s.on("workspace_progress", ({ workflowId: wId, percent, currentPhase: cp }: any) => {
@@ -203,58 +211,27 @@ function WorkspacePage() {
     const vs = io(`${BACKEND_URL}/voice-assistant`, { transports: ["websocket", "polling"], withCredentials: true });
     voiceSocket.current = vs;
     vs.on("ai_status", ({ status }: any) => {
-      setMentorStatus(status === "Thinking..." ? "thinking" : "idle");
+      // Handled by hook
     });
     vs.on("voice_reply", ({ reply }: any) => {
       addMsg("assistant", reply);
-      setMentorStatus("speaking");
       speak(reply);
       setIsSending(false);
     });
 
-    synthRef.current = window.speechSynthesis;
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SR) {
-      const rec = new SR();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = "en-US";
-      rec.onresult = (e: any) => {
-        const t = e.results[0][0].transcript;
-        setIsListening(false);
-        setMentorStatus("thinking");
-        sendMentor(t);
-      };
-      rec.onerror = () => setIsListening(false);
-      rec.onend = () => setIsListening(false);
-      recognitionRef.current = rec;
-    }
-    return () => { vs.disconnect(); synthRef.current?.cancel(); };
+    return () => { vs.disconnect(); stopAll(); };
   }, []);
 
   const sendMentor = (text: string) => {
     if (!text.trim()) return;
     addMsg("user", text);
     setIsSending(true);
-    setMentorStatus("thinking");
     voiceSocket.current?.emit("voice_message", { text });
   };
 
-  const speak = (text: string) => {
-    if (!synthRef.current) return;
-    isSpeakingRef.current = true;
-    synthRef.current.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    const voices = synthRef.current.getVoices();
-    const v = voices.find(v => v.name.includes("Google") || v.name.includes("Natural")) || voices[0];
-    if (v) u.voice = v;
-    u.onend = () => { isSpeakingRef.current = false; setMentorStatus("idle"); };
-    synthRef.current.speak(u);
-  };
-
   const toggleVoice = () => {
-    if (isListening) { recognitionRef.current?.stop(); setIsListening(false); }
-    else { synthRef.current?.cancel(); recognitionRef.current?.start(); setIsListening(true); setMentorStatus("listening"); }
+    if (isListening) stopListening();
+    else startListening();
   };
 
   // ─── Render tab content ─────────────────────────────────────────────────────
@@ -286,7 +263,7 @@ function WorkspacePage() {
           </div>
           <div className="grid grid-cols-2 gap-2">
             {agents.map(a => (
-              <div key={a.name} className={`flex items-center gap-2 rounded-xl px-3 py-2 border text-xs font-medium ${{COMPLETED:"text-green-600 bg-green-50 border-green-200",RUNNING:"text-amber-600 bg-amber-50 border-amber-200",FAILED:"text-red-600 bg-red-50 border-red-200"}[a.status] || "text-slate-400 bg-slate-50 border-slate-200"}`}>
+              <div key={a.name} className={`flex items-center gap-2 rounded-xl px-3 py-2 border text-xs font-medium ${({COMPLETED:"text-green-600 bg-green-50 border-green-200",RUNNING:"text-amber-600 bg-amber-50 border-amber-200",FAILED:"text-red-600 bg-red-50 border-red-200"} as Record<string,string>)[a.status] || "text-slate-400 bg-slate-50 border-slate-200"}`}>
                 {a.status === "COMPLETED" ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> : a.status === "RUNNING" ? <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin" /> : a.status === "FAILED" ? <XCircle className="h-3.5 w-3.5 text-red-500" /> : <Circle className="h-3.5 w-3.5 text-slate-300" />}
                 <span className="truncate">{a.name}</span>
               </div>

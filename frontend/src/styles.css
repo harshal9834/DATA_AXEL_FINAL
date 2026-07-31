@@ -154,29 +154,83 @@
   }
 }
 
-/* ── Google Translate Banner Crusher ─────────────────────────────────────── */
-/* Prevent Google from shifting the top of the page */
-html { top: 0 !important; }
-body { top: 0 !important; position: static !important; }
+/* ═══════════════════════════════════════════════════════════════════════════
+   Google Translate — Complete Banner Crusher & UI Protection
+   Hides ALL Google UI chrome while keeping translations active.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Hide the actual banner frame and background iframe */
-.skiptranslate iframe,
+/* 1. Prevent Google from pushing the body/html down */
+html, body {
+  top: 0 !important;
+  position: static !important;
+  margin-top: 0 !important;
+}
+
+/* 2. Hide the Google Translate banner bar */
+.skiptranslate,
 .goog-te-banner-frame,
 .goog-te-banner-frame.skiptranslate,
-.goog-te-gadget-simple {
+.VIpgJd-ZVi9od-xl07Ob-OEVmcd,
+.VIpgJd-yAWNEb-VIpgJd-fmcmS-sn54Q {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* 3. Hide the Google Translate gadget/widget */
+.goog-te-gadget,
+.goog-te-gadget-simple,
+.goog-te-gadget-icon,
+.goog-logo-link,
+.goog-te-combo {
   display: none !important;
   visibility: hidden !important;
 }
 
-/* Hide the 'Original Text' tooltip when hovering over translated text */
+/* 4. Hide tooltips that appear on translated text hover */
 #goog-gt-tt,
 .goog-te-balloon-frame,
-#goog-gt-m {
+#goog-gt-m,
+.jfk-bubble,
+.jfk-bubble-closebtn-id,
+.jfk-bubble-arrow,
+.jfk-bubble-shadow {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* 5. Remove yellow/blue highlight on translated words */
+.goog-text-highlight,
+.goog-te-highlight {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* 6. Remove the Google branding at top of popup */
+.goog-te-menu-value:before,
+.goog-te-menu-value span,
+.goog-te-menu-frame {
   display: none !important;
 }
 
-/* Remove the blue/yellow highlight on translated words */
-.goog-text-highlight {
-  background-color: transparent !important;
-  box-shadow: none !important;
+/* 7. Ensure the hidden translate container does not affect layout */
+#google_translate_element {
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  top: -9999px !important;
+  left: -9999px !important;
 }
+
+/* 8. Protect notranslate elements explicitly */
+.notranslate {
+  translate: no !important;
+  transform: none;
+}

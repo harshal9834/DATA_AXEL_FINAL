@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader } from "../components/app-shell";
-import { Check } from "lucide-react";
+import { Check, Globe, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../hooks/useAuth";
 import { updateProfile } from "firebase/auth";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export const Route = createFileRoute("/app/settings")({
   head: () => ({
@@ -38,7 +39,7 @@ function Settings() {
         <div className="card-premium p-8">
           {tab === "Profile" && <Profile />}
           {tab === "Theme" && <Theme />}
-          {tab === "Language" && <Simple title="Language" desc="Choose your interface language." items={["English (US)", "Español", "Deutsch", "Français", "हिन्दी", "日本語"]} />}
+          {tab === "Language" && <LanguageSettings />}
           {tab === "Notifications" && <Notifications />}
           {tab === "AI Models" && <Models />}
           {tab === "API Keys" && <Keys />}
@@ -117,18 +118,70 @@ function Theme() {
   );
 }
 
-function Simple({ title, desc, items }: { title: string; desc: string; items: string[] }) {
-  const [sel, setSel] = useState(items[0]);
+function LanguageSettings() {
+  const { language, setLanguage, availableLanguages } = useLanguage();
+  const currentLang = availableLanguages.find(l => l.code === language) ?? availableLanguages[0];
+
+  const handleReset = () => {
+    setLanguage('en');
+    toast.success('Language reset to English');
+  };
+
   return (
-    <div>
-      <h2 className="text-lg font-bold">{title}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {items.map((i) => (
-          <button key={i} onClick={() => setSel(i)} className={`flex items-center justify-between rounded-xl border px-4 py-3 text-sm ${sel === i ? "border-primary bg-primary/5 font-semibold" : "border-border/70 bg-white"}`}>
-            {i} {sel === i && <Check className="h-4 w-4 text-primary" />}
-          </button>
-        ))}
+    <div className="max-w-xl">
+      <h2 className="text-lg font-bold notranslate">Language Settings</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Choose the interface language for your AI Mentor OS.</p>
+
+      {/* Current Language Card */}
+      <div className="mt-5 flex items-center gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-2xl">
+          {currentLang.flag}
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Currently Active</p>
+          <p className="text-base font-bold notranslate">{currentLang.nativeName}</p>
+          <p className="text-xs text-muted-foreground notranslate">{currentLang.name} &bull; {currentLang.speechCode}</p>
+        </div>
+      </div>
+
+      {/* Language Grid */}
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        {availableLanguages.map(lang => {
+          const isActive = lang.code === language;
+          return (
+            <button
+              key={lang.code}
+              onClick={() => {
+                setLanguage(lang.code);
+                toast.success(`Language changed to ${lang.name}`, { duration: 2000 });
+              }}
+              className={`notranslate flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+                isActive
+                  ? 'border-primary bg-primary/5 shadow-sm'
+                  : 'border-border/70 bg-white hover:border-primary/30 hover:bg-accent'
+              }`}
+            >
+              <span className="notranslate text-xl">{lang.flag}</span>
+              <div className="notranslate flex-1 min-w-0">
+                <div className="notranslate font-semibold text-sm truncate">{lang.nativeName}</div>
+                <div className="notranslate text-xs text-muted-foreground">{lang.name}</div>
+              </div>
+              {isActive && <Check className="notranslate h-4 w-4 text-primary shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Reset */}
+      <div className="mt-6 flex items-center gap-3">
+        <button
+          onClick={handleReset}
+          className="notranslate flex items-center gap-2 rounded-xl border border-border/70 bg-white px-4 py-2 text-sm font-medium hover:bg-accent transition"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset to English
+        </button>
+        <p className="text-xs text-muted-foreground">Translation is powered by Google Translate.</p>
       </div>
     </div>
   );
