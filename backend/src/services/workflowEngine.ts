@@ -1,4 +1,5 @@
 import { prisma, io } from '../server';
+import { onWorkflowCompleted, onWorkflowFailed } from './eventTracking';
 
 import { ResearchAgent } from './agents/researchAgent';
 import { InnovationAgent } from './agents/innovationAgent';
@@ -325,6 +326,9 @@ export async function startWorkflow(workflowId: string, resumeFromAgent?: string
         });
         io.emit('workflow_failed', { id: workflowId, error: `Agent ${agentName} failed.` });
         
+        // Trigger failure tracking
+        await onWorkflowFailed(workflowId, error.message);
+        
         return; // Halt workflow
       }
     }
@@ -352,6 +356,10 @@ export async function startWorkflow(workflowId: string, resumeFromAgent?: string
     });
     io.emit('workflow_completed', { id: workflowId, status: 'COMPLETED', overallProgress: 100 });
     console.log(`[Workflow Engine] Completed workflow: ${workflowId}`);
+    
+    // Trigger analytics update
+    await onWorkflowCompleted(workflowId, workflow.userId);
+    
     
   } catch (error: any) {
     console.error('[Workflow Engine] Critical Error:', error);

@@ -30,6 +30,12 @@ model User {
   analysisResults      AnalysisResult[]
   analytics           Analytics[]
   projectBlueprints    ProjectBlueprint[]
+  researchPapers      ResearchPaper[]
+  recommendations     Recommendation[]
+  savedResources      SavedResource[]
+  aiSessions          AISession[]
+  userAnalyticsData   UserAnalytics?
+  dashboardMetrics    DashboardMetric[]
 }
 
 model Workflow {
@@ -45,6 +51,7 @@ model Workflow {
   additionalNotes      String?
   overallProgress      Int             @default(0)
   currentAgent         String?
+  projectContext       String?         // AI-analyzed context: JSON with requirements, entities, tech stack
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   userId               String
@@ -56,6 +63,24 @@ model Workflow {
   memoryNodes       MemoryNode[]
   conversations     ConversationMemory[]
   projectMemory     ProjectMemoryState?
+  uploadedFiles     UploadedFile[]
+}
+
+model UploadedFile {
+  id            String   @id @default(uuid())
+  workflowId    String
+  filename      String
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  extractedText String?  // Full extracted text content
+  ocrResult     String?  // OCR output for images
+  status        String   @default("PENDING") // PENDING, EXTRACTED, FAILED
+  uploadedAt    DateTime @default(now())
+
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
 }
 
 model WorkflowAgent {
@@ -242,4 +267,136 @@ model ProjectMemoryState {
   updatedAt         DateTime @updatedAt
 
   workflow          Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// ─── DASHBOARD DATA MODELS ───────────────────────────────────────────────────
+
+model TrendingTechnology {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  category  String
+  mention   Int      @default(1)
+  lastUpdated DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([name])
+}
+
+model ResearchPaper {
+  id        String   @id @default(uuid())
+  title     String
+  authors   String
+  source    String
+  url       String?
+  date      DateTime @default(now())
+  summary   String?
+  keywords  String?
+  userId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Recommendation {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // "task", "research", "project", "technology"
+  title     String
+  description String?
+  priority  String   @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
+  actionLink String?
+  viewed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Hackathon {
+  id        String   @id @default(uuid())
+  title     String
+  prize     String?
+  registrationDate DateTime?
+  eventDate DateTime
+  website   String?
+  status    String   @default("UPCOMING") // "UPCOMING", "ONGOING", "COMPLETED"
+  createdAt DateTime @default(now())
+
+  @@index([eventDate])
+}
+
+model SavedResource {
+  id        String   @id @default(uuid())
+  userId    String
+  category  String   // "GitHub", "Paper", "Dataset", "Course", "Blog", "API", etc.
+  title     String
+  url       String
+  description String?
+  tags      String?  // JSON array
+  difficulty String?
+  savedAt   DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, url])
+  @@index([userId, category])
+}
+
+model AISession {
+  id        String   @id @default(uuid())
+  userId    String
+  workflowId String?
+  type      String   // "workflow", "voice", "chat", "analysis"
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  duration  Int?     // milliseconds
+  messageCount Int   @default(0)
+  language  String   @default("en")
+  voiceUsed Boolean  @default(false)
+  llmUsed   String?  // "openrouter", "openai", etc.
+  tokensUsed Int     @default(0)
+  estimatedCost Float @default(0)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+}
+
+model UserAnalytics {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  projectsCreated Int   @default(0)
+  researchGenerated Int  @default(0)
+  aiCallsMade Int    @default(0)
+  voiceSessionsCount Int @default(0)
+  documentsGenerated Int @default(0)
+  totalMessagesExchanged Int @default(0)
+  totalTokensUsed Int @default(0)
+  innovationScore Int @default(0)
+  lastActiveAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DashboardMetric {
+  id        String   @id @default(uuid())
+  userId    String
+  metric    String   // "total_projects", "research_reports", "resources_saved", "ai_sessions", "documentation_count", "innovation_score"
+  value     Float
+  previousValue Float @default(0)
+  delta     Float    @default(0)
+  dataPoints String?  // JSON array of last 7 days data
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metric])
+  @@index([userId])
 }

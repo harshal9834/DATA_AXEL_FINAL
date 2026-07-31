@@ -114,6 +114,12 @@ console.log('[DEBUG] Voice Ready');
 
 import workflowRoutes from './routes/workflowRoutes';
 import workspaceRoutes from './routes/workspaceRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
+import resourcesRoutes from './routes/resourcesRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
+import analyticsAdvancedRoutes from './routes/analyticsAdvancedRoutes';
+import projectRoutes from './routes/projectRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -128,6 +134,12 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/workspace', workspaceRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/resources', resourcesRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/analytics-advanced', analyticsAdvancedRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Global Error Handler
 app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {

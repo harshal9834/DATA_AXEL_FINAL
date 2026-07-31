@@ -16,6 +16,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppAgentsRouteImport } from './routes/app.agents'
+import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
 import { Route as AppArchitectureRouteImport } from './routes/app.architecture'
 import { Route as AppAssistantRouteImport } from './routes/app.assistant'
 import { Route as AppDeepsearchRouteImport } from './routes/app.deepsearch'
@@ -64,6 +65,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppAgentsRoute = AppAgentsRouteImport.update({
   id: '/agents',
   path: '/agents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const AppArchitectureRoute = AppArchitectureRouteImport.update({
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/app/agents': typeof AppAgentsRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/architecture': typeof AppArchitectureRoute
   '/app/assistant': typeof AppAssistantRoute
   '/app/deepsearch': typeof AppDeepsearchRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/app/agents': typeof AppAgentsRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/architecture': typeof AppArchitectureRoute
   '/app/assistant': typeof AppAssistantRoute
   '/app/deepsearch': typeof AppDeepsearchRoute
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/app/agents': typeof AppAgentsRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/architecture': typeof AppArchitectureRoute
   '/app/assistant': typeof AppAssistantRoute
   '/app/deepsearch': typeof AppDeepsearchRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-email'
     | '/app/agents'
+    | '/app/analytics'
     | '/app/architecture'
     | '/app/assistant'
     | '/app/deepsearch'
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-email'
     | '/app/agents'
+    | '/app/analytics'
     | '/app/architecture'
     | '/app/assistant'
     | '/app/deepsearch'
@@ -260,6 +271,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-email'
     | '/app/agents'
+    | '/app/analytics'
     | '/app/architecture'
     | '/app/assistant'
     | '/app/deepsearch'
@@ -334,6 +346,13 @@ declare module '@tanstack/react-router' {
       path: '/agents'
       fullPath: '/app/agents'
       preLoaderRoute: typeof AppAgentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/architecture': {
@@ -451,6 +470,7 @@ const AppProjectsRouteWithChildren = AppProjectsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAgentsRoute: typeof AppAgentsRoute
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppArchitectureRoute: typeof AppArchitectureRoute
   AppAssistantRoute: typeof AppAssistantRoute
   AppDeepsearchRoute: typeof AppDeepsearchRoute
@@ -469,6 +489,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAgentsRoute: AppAgentsRoute,
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppArchitectureRoute: AppArchitectureRoute,
   AppAssistantRoute: AppAssistantRoute,
   AppDeepsearchRoute: AppDeepsearchRoute,
