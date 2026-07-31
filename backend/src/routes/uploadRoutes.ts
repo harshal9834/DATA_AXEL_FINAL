@@ -53,7 +53,7 @@ const upload = multer({
 async function extractTextFromFile(filePath: string, mimeType: string): Promise<string> {
   try {
     if (mimeType === 'application/pdf') {
-      const pdfParse = (await import('pdf-parse')).default;
+      const pdfParse = require('pdf-parse');
       const buffer = fs.readFileSync(filePath);
       const data = await pdfParse(buffer);
       return data.text || '';
@@ -122,7 +122,7 @@ ${extractedText.slice(0, 8000)}`;
         'X-Title': 'Data Axel Insight'
       },
       body: JSON.stringify({
-        model: 'google/gemini-flash-1.5',
+        model: 'google/gemini-1.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }

@@ -72,7 +72,7 @@ export const io = new Server(httpServer, {
   pingTimeout: 60000,
   pingInterval: 25000,
   cors: {
-    origin: ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
+    origin: ["http://localhost:3000", "http://localhost:3002", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:3002", "http://127.0.0.1:5173"],
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -99,7 +99,31 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+import { adminAuth } from './firebase/firebase-admin';
+
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      return next(new Error('Authentication error'));
+    }
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const user = await prisma.user.findUnique({ where: { firebase_uid: decodedToken.uid } });
+    if (!user) {
+      return next(new Error('User not found'));
+    }
+    socket.data.userId = user.id;
+    next();
+  } catch (err) {
+    next(new Error('Authentication error'));
+  }
+});
+
 io.on('connection', (socket) => {
+  console.log('A client connected:', socket.id, 'User:', socket.data.userId);
+  if (socket.data.userId) {
+    socket.join(socket.data.userId);
+  }
   console.log('A client connected:', socket.id);
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -118,6 +142,7 @@ import dashboardRoutes from './routes/dashboardRoutes';
 import resourcesRoutes from './routes/resourcesRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 import analyticsAdvancedRoutes from './routes/analyticsAdvancedRoutes';
+import researchWorkspaceRoutes from './routes/researchWorkspaceRoutes';
 import projectRoutes from './routes/projectRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 
@@ -138,6 +163,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/resources', resourcesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/analytics-advanced', analyticsAdvancedRoutes);
+app.use('/api/research-workspace', researchWorkspaceRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/upload', uploadRoutes);
 

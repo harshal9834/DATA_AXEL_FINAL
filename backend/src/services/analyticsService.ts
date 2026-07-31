@@ -35,8 +35,8 @@ export async function getKPIMetrics(userId: string) {
       prisma.backendResult.count({ where: { userId } }),
       prisma.frontendResult.count({ where: { userId } }),
       prisma.documentationResult.count({ where: { userId } }),
-      prisma.aiSession.count({ where: { userId } }),
-      prisma.aiSession.count({ where: { userId, voiceUsed: true } }),
+      prisma.aISession.count({ where: { userId } }),
+      prisma.aISession.count({ where: { userId, voiceUsed: true } }),
       prisma.userAnalytics.findUnique({ where: { userId } })
     ]);
 
@@ -87,7 +87,7 @@ export async function getProjectCreationTrends(userId: string, period: 'daily' |
       const date = new Date(w.createdAt);
 
       if (period === 'daily') {
-        key = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        key = date.toISOString().split('T')[0] || ''; // YYYY-MM-DD
       } else if (period === 'weekly') {
         const week = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
         key = `Week ${week}`;
@@ -247,6 +247,7 @@ export async function getProjectInsights(userId: string) {
       where: { userId },
       select: {
         id: true,
+        title: true,
         domain: true,
         overallProgress: true,
         createdAt: true,
@@ -409,7 +410,7 @@ export async function getResearchTrends(userId: string, period: 'daily' | 'weekl
 
 export async function getDailyTokenUsage(userId: string, days: number = 30) {
   try {
-    const sessions = await prisma.aiSession.findMany({
+    const sessions = await prisma.aISession.findMany({
       where: { userId, startedAt: { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) } },
       select: { startedAt: true, tokensUsed: true }
     });
@@ -417,7 +418,7 @@ export async function getDailyTokenUsage(userId: string, days: number = 30) {
     const dailyData: Record<string, number> = {};
 
     sessions.forEach(s => {
-      const date = new Date(s.startedAt).toISOString().split('T')[0];
+      const date = new Date(s.startedAt).toISOString().split('T')[0] || '';
       dailyData[date] = (dailyData[date] || 0) + s.tokensUsed;
     });
 
@@ -434,7 +435,7 @@ export async function getDailyTokenUsage(userId: string, days: number = 30) {
 
 export async function getVoiceAnalytics(userId: string) {
   try {
-    const voiceSessions = await prisma.aiSession.findMany({
+    const voiceSessions = await prisma.aISession.findMany({
       where: { userId, voiceUsed: true },
       select: { duration: true, messageCount: true, startedAt: true }
     });
@@ -546,7 +547,7 @@ async function getAverageResearch(userId: string): Promise<number> {
       })
     );
 
-    const total = researchCounts.reduce((sum, r) => sum + r, 0);
+    const total = researchCounts.reduce((sum: number, r: number) => sum + r, 0);
     return Math.round(total / workflows.length);
   } catch {
     return 0;
@@ -555,7 +556,7 @@ async function getAverageResearch(userId: string): Promise<number> {
 
 async function getTotalTokensUsed(userId: string): Promise<number> {
   try {
-    const result = await prisma.aiSession.aggregate({
+    const result = await prisma.aISession.aggregate({
       where: { userId },
       _sum: { tokensUsed: true }
     });

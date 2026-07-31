@@ -25,7 +25,7 @@ export async function calculateUserMetrics(userId: string) {
     });
 
     // Count AI sessions
-    const sessionsCount = await prisma.aiSession.count({
+    const sessionsCount = await prisma.aISession.count({
       where: { userId }
     });
 
@@ -35,7 +35,7 @@ export async function calculateUserMetrics(userId: string) {
     });
 
     // Calculate total tokens used
-    const sessions = await prisma.aiSession.findMany({
+    const sessions = await prisma.aISession.findMany({
       where: { userId },
       select: { tokensUsed: true }
     });
@@ -207,7 +207,7 @@ export async function generateRecommendations(userId: string) {
           userId,
           type: rec.type,
           title: rec.title,
-          description: rec.description,
+          description: rec.description ?? null,
           priority: rec.priority,
           expiresAt
         }
@@ -229,9 +229,9 @@ export async function recordResearchPaper(
   authors: string,
   source: string,
   data: {
-    url?: string;
-    summary?: string;
-    keywords?: string;
+    url?: string | undefined;
+    summary?: string | undefined;
+    keywords?: string | undefined;
   }
 ) {
   try {
@@ -241,9 +241,9 @@ export async function recordResearchPaper(
         title,
         authors,
         source,
-        url: data.url,
-        summary: data.summary,
-        keywords: data.keywords,
+        url: data.url ?? null,
+        summary: data.summary ?? null,
+        keywords: data.keywords ?? null,
         date: new Date()
       }
     });

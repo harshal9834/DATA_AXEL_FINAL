@@ -11,7 +11,7 @@ router.post('/track-session', async (req: AuthRequest, res) => {
     const userId = req.user.id;
     const { workflowId, type, language, voiceUsed, llmUsed, tokensUsed } = req.body;
 
-    const session = await prisma.aiSession.create({
+    const session = await prisma.aISession.create({
       data: {
         userId,
         workflowId,
@@ -41,7 +41,7 @@ router.post('/end-session/:sessionId', async (req: AuthRequest, res) => {
     const { sessionId } = req.params;
     const { messageCount, tokensUsed } = req.body;
 
-    const session = await prisma.aiSession.findUnique({ where: { id: sessionId } });
+    const session = await prisma.aISession.findUnique({ where: { id: sessionId } });
     if (!session || session.userId !== userId) {
       return res.status(404).json({ error: 'Session not found' });
     }
@@ -49,7 +49,7 @@ router.post('/end-session/:sessionId', async (req: AuthRequest, res) => {
     const endedAt = new Date();
     const duration = endedAt.getTime() - session.startedAt.getTime();
 
-    const updatedSession = await prisma.aiSession.update({
+    const updatedSession = await prisma.aISession.update({
       where: { id: sessionId },
       data: {
         endedAt,
@@ -95,7 +95,7 @@ router.get('/sessions', async (req: AuthRequest, res) => {
     const userId = req.user.id;
     const limit = parseInt(req.query.limit as string) || 20;
 
-    const sessions = await prisma.aiSession.findMany({
+    const sessions = await prisma.aISession.findMany({
       where: { userId },
       orderBy: { startedAt: 'desc' },
       take: limit

@@ -75,10 +75,10 @@ router.get('/minimal/intelligence', async (req: AuthRequest, res) => {
       : 'No pending deadlines';
 
     res.json({
-      bestProject: {
+      bestProject: bestProject ? {
         title: bestProject.title,
         progress: bestProject.overallProgress
-      },
+      } : null,
       needsAttention: needsAttention ? {
         title: needsAttention.title,
         issue: needsAttention.overallProgress < 50 ? 'Architecture Pending' : 'Frontend Pending'
@@ -125,7 +125,7 @@ router.get('/minimal/analytics', async (req: AuthRequest, res) => {
         { name: 'Running', value: statusMap['RUNNING'] },
         { name: 'Draft', value: statusMap['CREATED'] },
         { name: 'Failed', value: statusMap['FAILED'] }
-      ].filter(item => item.value > 0)
+      ].filter(item => (item.value ?? 0) > 0)
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

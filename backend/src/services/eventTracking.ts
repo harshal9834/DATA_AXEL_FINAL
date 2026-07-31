@@ -1,5 +1,5 @@
-import { prisma } from '../server';
-import { calculateUserMetrics, trackTrendingTechnology, recordResearchPaper } from './dashboardService';
+import { prisma } from '../server.js';
+import { calculateUserMetrics, trackTrendingTechnology, recordResearchPaper } from './dashboardService.js';
 
 /**
  * Event Tracking Service
@@ -11,7 +11,7 @@ export async function onWorkflowStarted(workflowId: string, userId: string) {
     console.log(`[EventTracking] Workflow started: ${workflowId}`);
     
     // Track analytics
-    const session = await prisma.aiSession.create({
+    const session = await prisma.aISession.create({
       data: {
         userId,
         workflowId,
@@ -30,12 +30,12 @@ export async function onWorkflowCompleted(workflowId: string, userId: string) {
     console.log(`[EventTracking] Workflow completed: ${workflowId}`);
 
     // End active session
-    const session = await prisma.aiSession.findFirst({
+    const session = await prisma.aISession.findFirst({
       where: { workflowId, endedAt: null }
     });
 
     if (session) {
-      await prisma.aiSession.update({
+      await prisma.aISession.update({
         where: { id: session.id },
         data: {
           endedAt: new Date(),
@@ -99,12 +99,12 @@ export async function onWorkflowFailed(workflowId: string, error: string) {
     console.log(`[EventTracking] Workflow failed: ${workflowId}, error: ${error}`);
 
     // End session
-    const session = await prisma.aiSession.findFirst({
+    const session = await prisma.aISession.findFirst({
       where: { workflowId, endedAt: null }
     });
 
     if (session) {
-      await prisma.aiSession.update({
+      await prisma.aISession.update({
         where: { id: session.id },
         data: {
           endedAt: new Date(),

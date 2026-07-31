@@ -84,8 +84,9 @@ router.get('/', async (req: AuthRequest, res) => {
 router.get('/:id', async (req: AuthRequest, res) => {
   try {
     const userId = req.user.id;
+    const id = req.params.id as string;
     const workflow = await prisma.workflow.findUnique({
-      where: { id: req.params.id, userId }
+      where: { id_userId: { id, userId } }
     });
     
     if (!workflow) {
@@ -151,8 +152,9 @@ router.post('/', async (req: AuthRequest, res) => {
 router.delete('/:id', async (req: AuthRequest, res) => {
   try {
     const userId = req.user.id;
+    const id = req.params.id as string;
     await prisma.workflow.delete({
-      where: { id: req.params.id, userId }
+      where: { id_userId: { id, userId } }
     });
     res.json({ success: true, message: "Project deleted successfully" });
   } catch (err: any) {

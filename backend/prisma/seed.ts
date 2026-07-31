@@ -57,16 +57,19 @@ async function main() {
   ];
 
   for (const h of hackathons) {
-    await prisma.hackathon.upsert({
-      where: { title: h.title },
-      update: { eventDate: h.eventDate },
-      create: {
-        title: h.title,
-        prize: h.prize,
-        eventDate: h.eventDate,
-        status: h.eventDate > new Date() ? 'UPCOMING' : 'COMPLETED'
-      }
+    const existing = await prisma.hackathon.findFirst({
+      where: { title: h.title }
     });
+    if (!existing) {
+      await prisma.hackathon.create({
+        data: {
+          title: h.title,
+          prize: h.prize,
+          eventDate: h.eventDate,
+          status: h.eventDate > new Date() ? 'UPCOMING' : 'COMPLETED'
+        }
+      });
+    }
   }
   console.log('✅ Seeded hackathons');
 

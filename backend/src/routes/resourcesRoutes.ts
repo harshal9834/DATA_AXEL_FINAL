@@ -100,7 +100,7 @@ router.post('/bookmark', async (req: AuthRequest, res) => {
 router.delete('/:id', async (req: AuthRequest, res) => {
   try {
     const userId = req.user.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const resource = await prisma.savedResource.findUnique({ where: { id } });
     if (!resource || resource.userId !== userId) {

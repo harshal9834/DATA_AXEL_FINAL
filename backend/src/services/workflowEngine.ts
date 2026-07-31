@@ -250,38 +250,55 @@ export async function startWorkflow(workflowId: string, resumeFromAgent?: string
           io.emit('backend_generated', { workflowId, backendData: output });
 
         } else if (agentName === 'Frontend Generation') {
+          const backendResult = await prisma.backendResult.findFirst({ where: { workflowId }, orderBy: { createdAt: 'desc' } });
+          const backendData = backendResult ? JSON.parse(backendResult.content) : {};
+          
           const frontendAgent = new FrontendAgent();
           output = await frontendAgent.execute({ 
             workflowId, 
             agentId: agent.id, 
             projectIdea: workflow.idea || '',
-            backendData: {} as any 
+            backendData: backendData 
           });
           
           await prisma.frontendResult.create({ data: { workflowId, userId: workflow.userId, content: JSON.stringify(output) } });
           accumulatedContext += `\n--- Frontend Results ---\n${JSON.stringify(output)}\n`;
 
         } else if (agentName === 'Documentation & Presentation') {
+          const backendResult = await prisma.backendResult.findFirst({ where: { workflowId }, orderBy: { createdAt: 'desc' } });
+          const frontendResult = await prisma.frontendResult.findFirst({ where: { workflowId }, orderBy: { createdAt: 'desc' } });
+          
+          const backendData = backendResult ? JSON.parse(backendResult.content) : {};
+          const frontendData = frontendResult ? JSON.parse(frontendResult.content) : {};
+
           const docsAgent = new DocumentationAgent();
           output = await docsAgent.execute({ 
             workflowId, 
             agentId: agent.id, 
             projectIdea: workflow.idea || '',
-            backendData: {} as any,
-            frontendData: {} as any 
+            backendData: backendData,
+            frontendData: frontendData 
           });
           
           await prisma.documentationResult.create({ data: { workflowId, userId: workflow.userId, content: JSON.stringify(output) } });
 
         } else if (agentName === 'Project Analysis') {
+          const backendResult = await prisma.backendResult.findFirst({ where: { workflowId }, orderBy: { createdAt: 'desc' } });
+          const frontendResult = await prisma.frontendResult.findFirst({ where: { workflowId }, orderBy: { createdAt: 'desc' } });
+          const docsResult = await prisma.documentationResult.findFirst({ where: { workflowId }, orderBy: { createdAt: 'desc' } });
+          
+          const backendData = backendResult ? JSON.parse(backendResult.content) : {};
+          const frontendData = frontendResult ? JSON.parse(frontendResult.content) : {};
+          const documentationData = docsResult ? JSON.parse(docsResult.content) : {};
+
           const analysisAgent = new AnalysisAgent();
           output = await analysisAgent.execute({ 
             workflowId, 
             agentId: agent.id, 
             projectIdea: workflow.idea || '',
-            backendData: {} as any,
-            frontendData: {} as any,
-            documentationData: {} as any 
+            backendData: backendData,
+            frontendData: frontendData,
+            documentationData: documentationData 
           });
           
           await prisma.analysisResult.create({ data: { workflowId, userId: workflow.userId, content: JSON.stringify(output) } });

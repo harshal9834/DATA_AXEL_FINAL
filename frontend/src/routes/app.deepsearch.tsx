@@ -1,110 +1,245 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { motion } from "framer-motion";
-import { Search, Bookmark, ExternalLink, Sparkles, Clock } from "lucide-react";
-import { useState } from "react";
-import { deepSearchResults } from "../lib/demo-data";
-import { PageHeader } from "../components/app-shell";
-import { toast } from "sonner";
+import { createFileRoute } from '@tanstack/react-router';
+import { useState } from 'react';
+import { Search, FileText, Sparkles, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { PageHeader } from '../components/app-shell';
 
-export const Route = createFileRoute("/app/deepsearch")({
+// ─── Feature imports (single source of truth) ─────────────────────────────────
+import {
+  // Hooks
+  useCreateWorkspace,
+  useWorkspace,
+  // Components
+  WorkspaceLoading,
+  WorkspaceError,
+  WorkspaceProgressCard,
+  WorkspaceTabNav,
+  // Tabs
+  ResearchTab,
+  PapersTab,
+  GitHubTab,
+  DatasetsTab,
+  ArchitectureTab,
+  ERDiagramTab,
+  FlowDiagramTab,
+  DocumentationTab,
+  SRSTab,
+  APIDesignTab,
+  // Types
+  type WorkspaceTabId,
+  type MainTabId,
+  // Constants
+  EXAMPLE_PROJECTS,
+} from '../features/workspace';
+
+// ─── Route ────────────────────────────────────────────────────────────────────
+
+export const Route = createFileRoute('/app/deepsearch')({
   head: () => ({
     meta: [
-      { title: "DeepSearch — AI Research Copilot" },
-      { name: "description", content: "Deep, multi-source AI research across papers, code, datasets and news." },
-      { property: "og:title", content: "DeepSearch — AI Research Copilot" },
-      { property: "og:description", content: "One search across every source that matters." },
+      { title: 'DeepSearch — AI Research Workspace' },
+      { name: 'description', content: 'AI-powered research workspace for project analysis and documentation.' },
     ],
   }),
   component: DeepSearch,
 });
 
-const filters = ["All", "Research Papers", "GitHub", "Datasets", "Documentation", "News", "Government"];
-const history = [
-  "Transformer forecasting for food demand",
-  "Federated learning on edge devices",
-  "Multimodal medical reasoning",
-  "Small language models for agents",
-];
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 function DeepSearch() {
-  const [q, setQ] = useState("AI to reduce restaurant food waste");
-  const [active, setActive] = useState("All");
-  const results = active === "All" ? deepSearchResults : deepSearchResults.filter((r) => r.source.includes(active.split(" ")[0]));
+  const [mainTab, setMainTab] = useState<MainTabId>('search');
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTabId>('research');
+  const [projectName, setProjectName] = useState('');
+  const [problemStatement, setProblemStatement] = useState('');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+
+  const createMutation = useCreateWorkspace();
+  const workspaceQuery = useWorkspace(activeWorkspaceId ?? '');
+
+  const workspace = workspaceQuery.data;
+
+  const handleStartResearch = async () => {
+    if (!projectName.trim() || !problemStatement.trim()) {
+      toast.error('Please enter both project name and problem statement');
+      return;
+    }
+    try {
+      const result = await createMutation.mutateAsync({ projectName, problemStatement });
+      setActiveWorkspaceId(result.workspaceId);
+      setMainTab('workspace');
+      toast.success('Research started! Generating comprehensive analysis...');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to start research';
+      toast.error(msg);
+    }
+  };
+
+  const handleExampleClick = (example: { name: string; problem: string }) => {
+    setProjectName(example.name);
+    setProblemStatement(example.problem);
+  };
 
   return (
-    <div>
-      <PageHeader title="DeepSearch" subtitle="AI-powered search across papers, code, datasets and government sources." />
+    <div className="space-y-6 pb-12">
+      <PageHeader
+        title="DeepSearch"
+        subtitle="AI Research Workspace powered by Gemini"
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-        <div>
-          <div className="card-premium relative p-2">
-            <div className="flex items-center gap-2 rounded-xl bg-white p-2">
-              <Sparkles className="ml-2 h-5 w-5 text-primary" />
-              <input value={q} onChange={(e) => setQ(e.target.value)}
-                className="flex-1 bg-transparent py-2 text-base outline-none"
-                placeholder="Ask anything — synthesize across 100M+ sources..."
-              />
-              <button className="rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-white shadow-glow">
-                <Search className="mr-1 inline h-4 w-4" /> Search
+      {/* Main Tab Navigator */}
+      <div className="flex gap-2 border-b border-border/50">
+        <button
+          onClick={() => setMainTab('search')}
+          className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+            mainTab === 'search'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Search className="inline mr-2 h-4 w-4" />
+          New Research
+        </button>
+        <button
+          onClick={() => setMainTab('workspace')}
+          disabled={!activeWorkspaceId}
+          className={`px-4 py-3 font-medium border-b-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            mainTab === 'workspace'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <FileText className="inline mr-2 h-4 w-4" />
+          Workspace
+        </button>
+      </div>
+
+      {/* Search Tab */}
+      {mainTab === 'search' && (
+        <div className="space-y-6">
+          <div className="card-premium p-8">
+            <h2 className="text-2xl font-bold mb-2">Start a New Research Project</h2>
+            <p className="text-muted-foreground mb-6">
+              Enter your project idea and let AI generate comprehensive research, architecture, and documentation.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="project-name" className="text-sm font-medium mb-2 block">
+                  Project Name
+                </label>
+                <input
+                  id="project-name"
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="e.g., Food Waste Management System"
+                  className="w-full px-4 py-2 rounded-lg border border-border/70 bg-white focus:outline-none focus:ring-2 focus:ring-primary dark:bg-transparent"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="problem-statement" className="text-sm font-medium mb-2 block">
+                  Problem Statement
+                </label>
+                <textarea
+                  id="problem-statement"
+                  value={problemStatement}
+                  onChange={(e) => setProblemStatement(e.target.value)}
+                  placeholder="Describe the problem your project solves..."
+                  rows={5}
+                  className="w-full px-4 py-2 rounded-lg border border-border/70 bg-white focus:outline-none focus:ring-2 focus:ring-primary dark:bg-transparent"
+                />
+              </div>
+
+              <button
+                onClick={handleStartResearch}
+                disabled={createMutation.isPending}
+                className="w-full py-3 rounded-lg bg-gradient-brand text-white font-semibold hover:shadow-lg disabled:opacity-75 disabled:cursor-not-allowed transition-shadow flex items-center justify-center gap-2"
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Starting Research...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Start Research Analysis
+                  </>
+                )}
               </button>
             </div>
-          </div>
 
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {filters.map((f) => (
-              <button key={f} onClick={() => setActive(f)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
-                  active === f ? "border-primary/40 bg-primary/10 text-primary" : "border-border/70 bg-white hover:bg-accent"
-                }`}>{f}</button>
-            ))}
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {results.map((r, i) => (
-              <motion.div key={r.title} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                className="card-premium hover-lift p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{r.source}</span>
-                      <span className="text-[11px] text-muted-foreground">{r.citation}</span>
-                    </div>
-                    <h3 className="mt-2 text-base font-bold leading-snug">{r.title}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground">{r.summary}</p>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <button className="rounded-lg border border-border/70 bg-white p-2 hover:bg-accent" onClick={() => toast.success("Saved")}>
-                      <Bookmark className="h-3.5 w-3.5" />
-                    </button>
-                    <button className="rounded-lg bg-gradient-brand p-2 text-white shadow-glow">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+            {/* Example Projects */}
+            <div className="mt-8 pt-8 border-t border-border/30">
+              <p className="text-xs text-muted-foreground font-medium mb-3 uppercase tracking-wide">
+                Example Projects
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                {EXAMPLE_PROJECTS.map((example) => (
+                  <button
+                    key={example.name}
+                    onClick={() => handleExampleClick(example)}
+                    className="p-2 rounded-lg border border-border/70 hover:bg-accent text-left text-xs transition-colors"
+                  >
+                    {example.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
+      )}
 
-        <aside className="space-y-4">
-          <div className="card-premium p-5">
-            <h3 className="flex items-center gap-2 text-sm font-bold"><Clock className="h-4 w-4 text-primary" /> Search History</h3>
-            <ul className="mt-3 space-y-1.5">
-              {history.map((h) => (
-                <li key={h}>
-                  <button onClick={() => setQ(h)} className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
-                    {h}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="card-premium bg-gradient-to-br from-primary/5 via-fuchsia-500/5 to-cyan-500/5 p-5">
-            <h3 className="text-sm font-bold">💡 Pro Tip</h3>
-            <p className="mt-2 text-xs text-muted-foreground">Combine filters to focus results. Try Research Papers + Datasets for reproducible baselines.</p>
-          </div>
-        </aside>
-      </div>
+      {/* Workspace Tab */}
+      {mainTab === 'workspace' && activeWorkspaceId && (
+        <>
+          {/* Loading */}
+          {workspaceQuery.isLoading && (
+            <WorkspaceLoading message="Loading workspace..." />
+          )}
+
+          {/* Error */}
+          {workspaceQuery.isError && (
+            <WorkspaceError
+              message={
+                workspaceQuery.error instanceof Error
+                  ? workspaceQuery.error.message
+                  : 'Failed to load workspace'
+              }
+              onRetry={() => workspaceQuery.refetch()}
+            />
+          )}
+
+          {/* Workspace Content */}
+          {workspace && (
+            <div className="space-y-6">
+              {/* Progress Card */}
+              <WorkspaceProgressCard workspace={workspace} />
+
+              {/* Sub-Tab Navigator */}
+              <WorkspaceTabNav
+                activeTab={workspaceTab}
+                onTabChange={setWorkspaceTab}
+              />
+
+              {/* Tab Content */}
+              <div className="space-y-6">
+                {workspaceTab === 'research' && <ResearchTab workspace={workspace} />}
+                {workspaceTab === 'papers' && <PapersTab workspace={workspace} />}
+                {workspaceTab === 'github' && <GitHubTab workspace={workspace} />}
+                {workspaceTab === 'datasets' && <DatasetsTab workspace={workspace} />}
+                {workspaceTab === 'architecture' && <ArchitectureTab workspace={workspace} />}
+                {workspaceTab === 'er' && <ERDiagramTab workspace={workspace} />}
+                {workspaceTab === 'flow' && <FlowDiagramTab workspace={workspace} />}
+                {workspaceTab === 'docs' && <DocumentationTab workspace={workspace} />}
+                {workspaceTab === 'srs' && <SRSTab workspace={workspace} />}
+                {workspaceTab === 'api' && <APIDesignTab workspace={workspace} />}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

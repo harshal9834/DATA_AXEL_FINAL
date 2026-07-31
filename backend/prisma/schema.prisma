@@ -36,6 +36,7 @@ model User {
   aiSessions          AISession[]
   userAnalyticsData   UserAnalytics?
   dashboardMetrics    DashboardMetric[]
+  researchWorkspaces  ResearchWorkspace[]
 }
 
 model Workflow {
@@ -64,6 +65,8 @@ model Workflow {
   conversations     ConversationMemory[]
   projectMemory     ProjectMemoryState?
   uploadedFiles     UploadedFile[]
+
+  @@unique([id, userId])
 }
 
 model UploadedFile {
@@ -399,4 +402,105 @@ model DashboardMetric {
 
   @@unique([userId, metric])
   @@index([userId])
+}
+
+// ─── DEEP SEARCH / AI RESEARCH WORKSPACE ────────────────────────────────────
+
+model ResearchWorkspace {
+  id                String   @id @default(uuid())
+  userId            String
+  projectName       String   // e.g., "Food Waste Management System"
+  problemStatement  String
+  status            String   @default("CREATED") // CREATED, RESEARCHING, COMPLETED, FAILED
+  
+  // Generated content
+  research          String?      // Gemini-generated research summary
+  architecture      String?      // Architecture diagram (Mermaid)
+  erDiagram         String?      // ER diagram (Mermaid)
+  flowDiagram       String?      // Flow diagram (Mermaid)
+  srsDocument       String?      // IEEE-style SRS
+  documentation    String?      // Technical documentation
+  apiDatabaseDesign String?     // API & Database design (NEW)
+  competitorAnalysis String?    // Competitor analysis (optional)
+  
+  // Generated PDFs
+  documentationPdfUrl String?   // Cloudinary URL
+  srsPdfUrl          String?   // Cloudinary URL
+  documentationPdfId  String?   // Cloudinary public ID
+  srsPdfId           String?   // Cloudinary public ID
+  documentationPdfSize Int?     // In bytes
+  srsPdfSize         Int?     // In bytes
+  
+  // Processing
+  currentStage      String?      // e.g., "Finding GitHub Repositories"
+  progress          Int          @default(0) // 0-100
+  totalStages       Int          @default(12)
+  error             String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  completedAt       DateTime?
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items             ResearchWorkspaceItem[]
+  stages            ResearchStage[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model ResearchWorkspaceItem {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  type              String   // "PAPER", "GITHUB", "DATASET"
+  
+  // Common fields
+  title             String
+  description       String?
+  url               String?
+  
+  // Paper-specific
+  authors           String?
+  publishedYear     Int?
+  summary           String?
+  keyFindings       String?      // JSON array
+  applications      String?      // JSON array
+  
+  // GitHub-specific
+  repoName          String?
+  stars             Int?
+  language          String?
+  owner             String?
+  updatedDate       DateTime?
+  
+  // Dataset-specific
+  rows              Int?
+  columns           Int?
+  downloadSource    String?
+  license           String?
+  datasource        String?      // "Kaggle", "UCI", "HuggingFace", "OpenML", "Government"
+  
+  // Metadata
+  relevanceScore    Float       @default(0.5) // 0.0 to 1.0
+  confidence        Float       @default(0.5) // 0.0 to 1.0
+  createdAt         DateTime @default(now())
+
+  workspace         ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, type])
+}
+
+model ResearchStage {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  stageName         String   // "Understanding Problem", "Researching", "Finding Papers", etc.
+  status            String   @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED
+  message           String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  durationMs        Int?
+  
+  workspace         ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
