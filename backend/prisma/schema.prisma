@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  firebase_uid   String   @unique
+  name           String?
+  email          String   @unique
+  photo_url      String?
+  provider       String?
+  role           String   @default("USER") // ADMIN, USER
+  language       String   @default("en")
+  email_verified Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  workflows           Workflow[]
+  researchResults     ResearchResult[]
+  innovationResults   InnovationResult[]
+  architectureResults ArchitectureResult[]
+  documentationResults DocumentationResult[]
+  backendResults       BackendResult[]
+  frontendResults      FrontendResult[]
+  analysisResults      AnalysisResult[]
+  analytics           Analytics[]
+  projectBlueprints    ProjectBlueprint[]
+}
+
+model Workflow {
+  id                   String          @id @default(uuid())
+  title                String
+  problemStatement     String?
+  idea                 String
+  domain               String?
+  priority             String?
+  timeline             String?
+  status               String          @default("CREATED") // CREATED, RUNNING, COMPLETED, FAILED
+  expectedDeliverables String?
+  additionalNotes      String?
+  overallProgress      Int             @default(0)
+  currentAgent         String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  userId               String
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agents            WorkflowAgent[]
+  logs              WorkflowLog[]
+  projectBlueprint  ProjectBlueprint?
+  memoryNodes       MemoryNode[]
+  conversations     ConversationMemory[]
+  projectMemory     ProjectMemoryState?
+}
+
+model WorkflowAgent {
+  id          String    @id @default(uuid())
+  workflowId  String
+  name        String
+  status       String    @default("WAITING") // WAITING, RUNNING, COMPLETED, FAILED
+  progress     Int       @default(0)
+  currentTask  String?
+  executionTime String?
+  outputJson   String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+  
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ResearchResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+  
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InnovationResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ArchitectureResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DocumentationResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BackendResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FrontendResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+
+
+
+model AnalysisResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowLog {
+  id         String   @id @default(uuid())
+  workflowId String
+  agentName  String?
+  level      String   @default("info")
+  title      String
+  detail     String
+  icon       String
+  color      String
+  createdAt  DateTime @default(now())
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model Analytics {
+  id         String   @id @default(uuid())
+  metric     String
+  value      Float
+  updatedAt  DateTime @updatedAt
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([metric, userId])
+}
+
+model ProjectBlueprint {
+  id                String   @id @default(uuid())
+  workflowId        String   @unique
+  researchSummary   String
+  innovationSummary String
+  architecture      String
+  databaseSchema    String
+  folderStructure   String
+  apiDesign         String
+  approvedAt        DateTime?
+  approvedBy        String?
+  createdAt         DateTime @default(now())
+  userId            String
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflow          Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model MemoryNode {
+  id          String   @id @default(uuid())
+  workflowId  String
+  entityName  String
+  entityType  String
+  attributes  String?
+  createdAt   DateTime @default(now())
+
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  sourceEdges MemoryEdge[] @relation("SourceNode")
+  targetEdges MemoryEdge[] @relation("TargetNode")
+}
+
+model MemoryEdge {
+  id           String   @id @default(uuid())
+  sourceNodeId String
+  targetNodeId String
+  relationship String
+  createdAt    DateTime @default(now())
+
+  sourceNode   MemoryNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode   MemoryNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+}
+
+model ConversationMemory {
+  id         String   @id @default(uuid())
+  workflowId String
+  role       String   // 'user' or 'ai'
+  content    String
+  createdAt  DateTime @default(now())
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ProjectMemoryState {
+  id                String   @id @default(uuid())
+  workflowId        String   @unique
+  projectName       String?
+  problemStatement  String?
+  targetUsers       String?
+  industry          String?
+  goals             String?
+  completedPhases   String?  // JSON array
+  pendingPhases     String?  // JSON array
+  generatedFiles    String?  // JSON array
+  generatedAPIs     String?  // JSON array
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workflow          Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
