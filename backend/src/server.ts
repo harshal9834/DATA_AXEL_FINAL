@@ -111,6 +111,8 @@ console.log('[DEBUG] Voice Ready');
 
 import workflowRoutes from './routes/workflowRoutes';
 import workspaceRoutes from './routes/workspaceRoutes';
+import knowledgeRoutes from './routes/knowledgeRoutes';
+import promptBuilderRoutes from './routes/promptBuilder';
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -125,6 +127,8 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/workspace', workspaceRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/prompt-builder', promptBuilderRoutes);
 
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

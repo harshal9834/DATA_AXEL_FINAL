@@ -1,16 +1,10 @@
 /**
- * AIProvider.ts — Central AI abstraction layer (OpenRouter)
+ * AIProvider.ts — Central AI abstraction layer (Groq)
  *
- * Fallback chain (all confirmed working free-tier 2025-07-31):
- *  1. google/gemma-4-26b-a4b-it:free      — best quality, clean outputs
- *  2. nvidia/nemotron-3-super-120b-a12b:free — large, capable
- *  3. nvidia/nemotron-3-nano-30b-a3b:free  — fast, reliable
- *  4. openrouter/free                       — OpenRouter auto-selects best available
- *
- * REMOVED (all returned 404 as of 2025-07-31):
- *  ✗ deepseek/deepseek-chat-v3-0324:free
- *  ✗ qwen/qwen3-coder:free
- *  ✗ meta-llama/llama-3.3-70b-instruct:free
+ * Fallback chain:
+ *  1. llama-3.3-70b-versatile
+ *  2. llama3-70b-8192
+ *  3. mixtral-8x7b-32768
  */
 
 import OpenAI from 'openai';
@@ -35,9 +29,9 @@ export interface AIProviderResponse {
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const MODELS: string[] = [
-  'meta-llama/llama-3.3-70b-instruct',
-  'google/gemini-2.5-flash',
-  'openai/gpt-4o-mini',
+  'llama-3.3-70b-versatile',
+  'llama3-70b-8192',
+  'mixtral-8x7b-32768',
 ];
 
 const FALLBACK_ERROR_MESSAGE =
@@ -46,22 +40,18 @@ const FALLBACK_ERROR_MESSAGE =
 // ─── Client factory ───────────────────────────────────────────────────────────
 
 function createClient(): OpenAI {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
 
   // === Diagnostic: always log key status on first use ===
   if (!apiKey) {
-    console.error('[AIProvider] ❌ OPENROUTER_API_KEY is NOT set in environment variables!');
-    throw new Error('OPENROUTER_API_KEY is not set in environment variables.');
+    console.error('[AIProvider] ❌ GROQ_API_KEY is NOT set in environment variables!');
+    throw new Error('GROQ_API_KEY is not set in environment variables.');
   }
-  console.log(`[AIProvider] ✅ OpenRouter client created. Key: ${apiKey.slice(0, 12)}...`);
+  console.log(`[AIProvider] ✅ Groq client created. Key: ${apiKey.slice(0, 12)}...`);
 
   return new OpenAI({
     apiKey,
-    baseURL: 'https://openrouter.ai/api/v1',
-    defaultHeaders: {
-      'HTTP-Referer': 'http://localhost:3001',
-      'X-Title': 'AI Research & Innovation Copilot',
-    },
+    baseURL: process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1',
   });
 }
 
@@ -101,16 +91,16 @@ async function callModel(
     const error = err as any;
     const status = error?.status ?? error?.statusCode ?? 'unknown';
     const detail = error?.error?.message ?? error?.message ?? String(err);
-    const apiKey = process.env.OPENROUTER_API_KEY || 'MISSING';
+    const apiKey = process.env.GROQ_API_KEY || 'MISSING';
     const maskedKey = apiKey.substring(0, 4) + '...' + apiKey.slice(-4);
     
     console.error(`\n=== ACTUAL RUNTIME FAILURE ===`);
     console.error(`- HTTP Status: ${status}`);
     console.error(`- Response Body: ${JSON.stringify(error?.error || error?.response?.data || detail)}`);
     console.error(`- Error Stack: ${error?.stack}`);
-    console.error(`- Selected Provider: OpenRouter`);
+    console.error(`- Selected Provider: Groq`);
     console.error(`- Selected Model: ${model}`);
-    console.error(`- API Endpoint: https://openrouter.ai/api/v1`);
+    console.error(`- API Endpoint: ${process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1'}`);
     console.error(`- API Key Loaded (masked): ${maskedKey}`);
     console.error(`==============================\n`);
     throw err; // re-throw so caller can handle per-attempt retry

@@ -23,6 +23,7 @@ import { Route as AppDocsRouteImport } from './routes/app.docs'
 import { Route as AppInnovationRouteImport } from './routes/app.innovation'
 import { Route as AppKnowledgeRouteImport } from './routes/app.knowledge'
 import { Route as AppProjectsRouteImport } from './routes/app.projects'
+import { Route as AppPromptBuilderRouteImport } from './routes/app.prompt-builder'
 import { Route as AppResearchRouteImport } from './routes/app.research'
 import { Route as AppResourcesRouteImport } from './routes/app.resources'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
@@ -101,6 +102,11 @@ const AppProjectsRoute = AppProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPromptBuilderRoute = AppPromptBuilderRouteImport.update({
+  id: '/prompt-builder',
+  path: '/prompt-builder',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppResearchRoute = AppResearchRouteImport.update({
   id: '/research',
   path: '/research',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/app/innovation': typeof AppInnovationRoute
   '/app/knowledge': typeof AppKnowledgeRoute
   '/app/projects': typeof AppProjectsRouteWithChildren
+  '/app/prompt-builder': typeof AppPromptBuilderRoute
   '/app/research': typeof AppResearchRoute
   '/app/resources': typeof AppResourcesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/app/innovation': typeof AppInnovationRoute
   '/app/knowledge': typeof AppKnowledgeRoute
   '/app/projects': typeof AppProjectsRouteWithChildren
+  '/app/prompt-builder': typeof AppPromptBuilderRoute
   '/app/research': typeof AppResearchRoute
   '/app/resources': typeof AppResourcesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/app/innovation': typeof AppInnovationRoute
   '/app/knowledge': typeof AppKnowledgeRoute
   '/app/projects': typeof AppProjectsRouteWithChildren
+  '/app/prompt-builder': typeof AppPromptBuilderRoute
   '/app/research': typeof AppResearchRoute
   '/app/resources': typeof AppResourcesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/app/innovation'
     | '/app/knowledge'
     | '/app/projects'
+    | '/app/prompt-builder'
     | '/app/research'
     | '/app/resources'
     | '/app/settings'
@@ -244,6 +254,7 @@ export interface FileRouteTypes {
     | '/app/innovation'
     | '/app/knowledge'
     | '/app/projects'
+    | '/app/prompt-builder'
     | '/app/research'
     | '/app/resources'
     | '/app/settings'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '/app/innovation'
     | '/app/knowledge'
     | '/app/projects'
+    | '/app/prompt-builder'
     | '/app/research'
     | '/app/resources'
     | '/app/settings'
@@ -385,6 +397,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/prompt-builder': {
+      id: '/app/prompt-builder'
+      path: '/prompt-builder'
+      fullPath: '/app/prompt-builder'
+      preLoaderRoute: typeof AppPromptBuilderRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/research': {
       id: '/app/research'
       path: '/research'
@@ -458,6 +477,7 @@ interface AppRouteChildren {
   AppInnovationRoute: typeof AppInnovationRoute
   AppKnowledgeRoute: typeof AppKnowledgeRoute
   AppProjectsRoute: typeof AppProjectsRouteWithChildren
+  AppPromptBuilderRoute: typeof AppPromptBuilderRoute
   AppResearchRoute: typeof AppResearchRoute
   AppResourcesRoute: typeof AppResourcesRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -476,6 +496,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppInnovationRoute: AppInnovationRoute,
   AppKnowledgeRoute: AppKnowledgeRoute,
   AppProjectsRoute: AppProjectsRouteWithChildren,
+  AppPromptBuilderRoute: AppPromptBuilderRoute,
   AppResearchRoute: AppResearchRoute,
   AppResourcesRoute: AppResourcesRoute,
   AppSettingsRoute: AppSettingsRoute,
