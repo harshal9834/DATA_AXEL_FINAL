@@ -1,0 +1,506 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  firebase_uid   String   @unique
+  name           String?
+  email          String   @unique
+  photo_url      String?
+  provider       String?
+  role           String   @default("USER") // ADMIN, USER
+  language       String   @default("en")
+  email_verified Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  workflows           Workflow[]
+  researchResults     ResearchResult[]
+  innovationResults   InnovationResult[]
+  architectureResults ArchitectureResult[]
+  documentationResults DocumentationResult[]
+  backendResults       BackendResult[]
+  frontendResults      FrontendResult[]
+  analysisResults      AnalysisResult[]
+  analytics           Analytics[]
+  projectBlueprints    ProjectBlueprint[]
+  researchPapers      ResearchPaper[]
+  recommendations     Recommendation[]
+  savedResources      SavedResource[]
+  aiSessions          AISession[]
+  userAnalyticsData   UserAnalytics?
+  dashboardMetrics    DashboardMetric[]
+  researchWorkspaces  ResearchWorkspace[]
+}
+
+model Workflow {
+  id                   String          @id @default(uuid())
+  title                String
+  problemStatement     String?
+  idea                 String
+  domain               String?
+  priority             String?
+  timeline             String?
+  status               String          @default("CREATED") // CREATED, RUNNING, COMPLETED, FAILED
+  expectedDeliverables String?
+  additionalNotes      String?
+  overallProgress      Int             @default(0)
+  currentAgent         String?
+  projectContext       String?         // AI-analyzed context: JSON with requirements, entities, tech stack
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  userId               String
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agents            WorkflowAgent[]
+  logs              WorkflowLog[]
+  projectBlueprint  ProjectBlueprint?
+  memoryNodes       MemoryNode[]
+  conversations     ConversationMemory[]
+  projectMemory     ProjectMemoryState?
+  uploadedFiles     UploadedFile[]
+
+  @@unique([id, userId])
+}
+
+model UploadedFile {
+  id            String   @id @default(uuid())
+  workflowId    String
+  filename      String
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  extractedText String?  // Full extracted text content
+  ocrResult     String?  // OCR output for images
+  status        String   @default("PENDING") // PENDING, EXTRACTED, FAILED
+  uploadedAt    DateTime @default(now())
+
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}
+
+model WorkflowAgent {
+  id          String    @id @default(uuid())
+  workflowId  String
+  name        String
+  status       String    @default("WAITING") // WAITING, RUNNING, COMPLETED, FAILED
+  progress     Int       @default(0)
+  currentTask  String?
+  executionTime String?
+  outputJson   String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+  
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ResearchResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+  
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InnovationResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ArchitectureResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DocumentationResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BackendResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FrontendResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+
+
+
+model AnalysisResult {
+  id         String   @id @default(uuid())
+  workflowId String   @unique
+  content    String
+  createdAt  DateTime @default(now())
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowLog {
+  id         String   @id @default(uuid())
+  workflowId String
+  agentName  String?
+  level      String   @default("info")
+  title      String
+  detail     String
+  icon       String
+  color      String
+  createdAt  DateTime @default(now())
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model Analytics {
+  id         String   @id @default(uuid())
+  metric     String
+  value      Float
+  updatedAt  DateTime @updatedAt
+  userId     String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([metric, userId])
+}
+
+model ProjectBlueprint {
+  id                String   @id @default(uuid())
+  workflowId        String   @unique
+  researchSummary   String
+  innovationSummary String
+  architecture      String
+  databaseSchema    String
+  folderStructure   String
+  apiDesign         String
+  approvedAt        DateTime?
+  approvedBy        String?
+  createdAt         DateTime @default(now())
+  userId            String
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflow          Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model MemoryNode {
+  id          String   @id @default(uuid())
+  workflowId  String
+  entityName  String
+  entityType  String
+  attributes  String?
+  createdAt   DateTime @default(now())
+
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  sourceEdges MemoryEdge[] @relation("SourceNode")
+  targetEdges MemoryEdge[] @relation("TargetNode")
+}
+
+model MemoryEdge {
+  id           String   @id @default(uuid())
+  sourceNodeId String
+  targetNodeId String
+  relationship String
+  createdAt    DateTime @default(now())
+
+  sourceNode   MemoryNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode   MemoryNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+}
+
+model ConversationMemory {
+  id         String   @id @default(uuid())
+  workflowId String
+  role       String   // 'user' or 'ai'
+  content    String
+  createdAt  DateTime @default(now())
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ProjectMemoryState {
+  id                String   @id @default(uuid())
+  workflowId        String   @unique
+  projectName       String?
+  problemStatement  String?
+  targetUsers       String?
+  industry          String?
+  goals             String?
+  completedPhases   String?  // JSON array
+  pendingPhases     String?  // JSON array
+  generatedFiles    String?  // JSON array
+  generatedAPIs     String?  // JSON array
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workflow          Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// ΓöÇΓöÇΓöÇ DASHBOARD DATA MODELS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+model TrendingTechnology {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  category  String
+  mention   Int      @default(1)
+  lastUpdated DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([name])
+}
+
+model ResearchPaper {
+  id        String   @id @default(uuid())
+  title     String
+  authors   String
+  source    String
+  url       String?
+  date      DateTime @default(now())
+  summary   String?
+  keywords  String?
+  userId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Recommendation {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // "task", "research", "project", "technology"
+  title     String
+  description String?
+  priority  String   @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
+  actionLink String?
+  viewed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Hackathon {
+  id        String   @id @default(uuid())
+  title     String
+  prize     String?
+  registrationDate DateTime?
+  eventDate DateTime
+  website   String?
+  status    String   @default("UPCOMING") // "UPCOMING", "ONGOING", "COMPLETED"
+  createdAt DateTime @default(now())
+
+  @@index([eventDate])
+}
+
+model SavedResource {
+  id        String   @id @default(uuid())
+  userId    String
+  category  String   // "GitHub", "Paper", "Dataset", "Course", "Blog", "API", etc.
+  title     String
+  url       String
+  description String?
+  tags      String?  // JSON array
+  difficulty String?
+  savedAt   DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, url])
+  @@index([userId, category])
+}
+
+model AISession {
+  id        String   @id @default(uuid())
+  userId    String
+  workflowId String?
+  type      String   // "workflow", "voice", "chat", "analysis"
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  duration  Int?     // milliseconds
+  messageCount Int   @default(0)
+  language  String   @default("en")
+  voiceUsed Boolean  @default(false)
+  llmUsed   String?  // "openrouter", "openai", etc.
+  tokensUsed Int     @default(0)
+  estimatedCost Float @default(0)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+}
+
+model UserAnalytics {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  projectsCreated Int   @default(0)
+  researchGenerated Int  @default(0)
+  aiCallsMade Int    @default(0)
+  voiceSessionsCount Int @default(0)
+  documentsGenerated Int @default(0)
+  totalMessagesExchanged Int @default(0)
+  totalTokensUsed Int @default(0)
+  innovationScore Int @default(0)
+  lastActiveAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DashboardMetric {
+  id        String   @id @default(uuid())
+  userId    String
+  metric    String   // "total_projects", "research_reports", "resources_saved", "ai_sessions", "documentation_count", "innovation_score"
+  value     Float
+  previousValue Float @default(0)
+  delta     Float    @default(0)
+  dataPoints String?  // JSON array of last 7 days data
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metric])
+  @@index([userId])
+}
+
+// ΓöÇΓöÇΓöÇ DEEP SEARCH / AI RESEARCH WORKSPACE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+model ResearchWorkspace {
+  id                String   @id @default(uuid())
+  userId            String
+  projectName       String   // e.g., "Food Waste Management System"
+  problemStatement  String
+  status            String   @default("CREATED") // CREATED, RESEARCHING, COMPLETED, FAILED
+  
+  // Generated content
+  research          String?      // Gemini-generated research summary
+  architecture      String?      // Architecture diagram (Mermaid)
+  erDiagram         String?      // ER diagram (Mermaid)
+  flowDiagram       String?      // Flow diagram (Mermaid)
+  srsDocument       String?      // IEEE-style SRS
+  documentation    String?      // Technical documentation
+  apiDatabaseDesign String?     // API & Database design (NEW)
+  competitorAnalysis String?    // Competitor analysis (optional)
+  
+  // Generated PDFs
+  documentationPdfUrl String?   // Cloudinary URL
+  srsPdfUrl          String?   // Cloudinary URL
+  documentationPdfId  String?   // Cloudinary public ID
+  srsPdfId           String?   // Cloudinary public ID
+  documentationPdfSize Int?     // In bytes
+  srsPdfSize         Int?     // In bytes
+  
+  // Processing
+  currentStage      String?      // e.g., "Finding GitHub Repositories"
+  progress          Int          @default(0) // 0-100
+  totalStages       Int          @default(12)
+  error             String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  completedAt       DateTime?
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items             ResearchWorkspaceItem[]
+  stages            ResearchStage[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model ResearchWorkspaceItem {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  type              String   // "PAPER", "GITHUB", "DATASET"
+  
+  // Common fields
+  title             String
+  description       String?
+  url               String?
+  
+  // Paper-specific
+  authors           String?
+  publishedYear     Int?
+  summary           String?
+  keyFindings       String?      // JSON array
+  applications      String?      // JSON array
+  
+  // GitHub-specific
+  repoName          String?
+  stars             Int?
+  language          String?
+  owner             String?
+  updatedDate       DateTime?
+  
+  // Dataset-specific
+  rows              Int?
+  columns           Int?
+  downloadSource    String?
+  license           String?
+  datasource        String?      // "Kaggle", "UCI", "HuggingFace", "OpenML", "Government"
+  
+  // Metadata
+  relevanceScore    Float       @default(0.5) // 0.0 to 1.0
+  confidence        Float       @default(0.5) // 0.0 to 1.0
+  createdAt         DateTime @default(now())
+
+  workspace         ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, type])
+}
+
+model ResearchStage {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  stageName         String   // "Understanding Problem", "Researching", "Finding Papers", etc.
+  status            String   @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED
+  message           String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  durationMs        Int?
+  
+  workspace         ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}

@@ -1,23 +1,31 @@
 import { Router } from "express";
+import { verifyFirebaseToken, AuthRequest } from "../middleware/verifyFirebaseToken";
 import { prisma } from "../server";
 import { mcpLogger } from "../utils/logger";
 
 const router = Router();
 
-// Get full workspace state - no auth required for internal workspace polling
-router.get("/:workflowId", async (req: any, res: any): Promise<void> => {
+// Get full workspace state
+router.get("/:workflowId", verifyFirebaseToken, async (req: AuthRequest, res: any): Promise<void> => {
   try {
     const { workflowId } = req.params as { workflowId: string };
+    const userId = req.user.id;
+
     const workflow = await prisma.workflow.findUnique({
       where: { id: workflowId },
       include: {
         agents: true,
-        blueprint: true,
+        projectBlueprint: true,
         memoryNodes: true,
-        projectMemoryState: true,
+        projectMemory: true,
       }
     });
     if (!workflow) { res.status(404).json({ error: "Workflow not found" }); return; }
+
+    if (workflow.userId !== userId) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
 
     // Fetch results separately to avoid Prisma include issues
     const [researchResults, innovationResults, architectureResults, backendResults, frontendResults, docsResults, analysisResults] = await Promise.all([
@@ -58,8 +66,8 @@ router.get("/:workflowId", async (req: any, res: any): Promise<void> => {
       backend: parseResult(backendResults),
       frontend: parseResult(frontendResults),
       documentation: parseResult(docsResults),
-      blueprint: workflow.blueprint,
-      projectState: workflow.projectMemoryState?.[0],
+      blueprint: workflow.projectBlueprint,
+      projectState: workflow.projectMemory,
       ...extendedDocs,
     };
 

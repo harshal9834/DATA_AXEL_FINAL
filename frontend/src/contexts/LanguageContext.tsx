@@ -1,92 +1,101 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useTranslation, I18nextProvider } from 'react-i18next';
-import i18nInstance from '../lib/i18n';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useGoogleTranslate, getStoredLanguage } from '../hooks/useGoogleTranslate';
 
-type LanguageContextType = {
-  language: string;
-  setLanguage: (lang: string) => void;
-  availableLanguages: { code: string; name: string; nativeName: string; flag: string }[];
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type LanguageOption = {
+  code: string;
+  name: string;
+  nativeName: string;
+  flag: string;
+  /** ISO 639-1 code passed to SpeechSynthesis/SpeechRecognition */
+  speechCode: string;
 };
 
-const availableLanguages = [
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
-  { code: 'mr', name: 'Marathi', nativeName: 'मराठी', flag: '🇮🇳' },
-  { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી', flag: '🇮🇳' },
-  { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
-  { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', flag: '🇮🇳' },
-  { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', flag: '🇮🇳' },
-  { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', flag: '🇮🇳' },
-  { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', flag: '🇮🇳' },
-  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇮🇳' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇮🇳' },
-  { code: 'or', name: 'Odia', nativeName: 'ଓଡ଼ିଆ', flag: '🇮🇳' },
+type LanguageContextType = {
+  language: string;           // UI/display code (e.g. 'hi')
+  speechLanguage: string;     // Speech code (e.g. 'hi-IN')
+  setLanguage: (lang: string) => void;
+  availableLanguages: LanguageOption[];
+};
+
+// ─── Language Manifest ────────────────────────────────────────────────────────
+
+const availableLanguages: LanguageOption[] = [
+  { code: 'en', name: 'English',   nativeName: 'English',    flag: '🇺🇸', speechCode: 'en-US' },
+  { code: 'hi', name: 'Hindi',     nativeName: 'हिन्दी',      flag: '🇮🇳', speechCode: 'hi-IN' },
+  { code: 'mr', name: 'Marathi',   nativeName: 'मराठी',       flag: '🇮🇳', speechCode: 'mr-IN' },
+  { code: 'gu', name: 'Gujarati',  nativeName: 'ગુજરાતી',    flag: '🇮🇳', speechCode: 'gu-IN' },
+  { code: 'pa', name: 'Punjabi',   nativeName: 'ਪੰਜਾਬੀ',     flag: '🇮🇳', speechCode: 'pa-IN' },
+  { code: 'bn', name: 'Bengali',   nativeName: 'বাংলা',       flag: '🇮🇳', speechCode: 'bn-IN' },
+  { code: 'ta', name: 'Tamil',     nativeName: 'தமிழ்',       flag: '🇮🇳', speechCode: 'ta-IN' },
+  { code: 'te', name: 'Telugu',    nativeName: 'తెలుగు',      flag: '🇮🇳', speechCode: 'te-IN' },
+  { code: 'kn', name: 'Kannada',   nativeName: 'ಕನ್ನಡ',      flag: '🇮🇳', speechCode: 'kn-IN' },
+  { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം',      flag: '🇮🇳', speechCode: 'ml-IN' },
+  { code: 'or', name: 'Odia',      nativeName: 'ଓଡ଼ିଆ',       flag: '🇮🇳', speechCode: 'or-IN' },
+  { code: 'ur', name: 'Urdu',      nativeName: 'اردو',        flag: '🇮🇳', speechCode: 'ur-IN' },
 ];
+
+// ─── Context ──────────────────────────────────────────────────────────────────
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-const LanguageProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { i18n } = useTranslation();
-  const [language, setLanguageState] = useState(i18n.language || 'en');
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
-  const setLanguage = (langCode: string) => {
-    // 1. Update i18next
-    i18n.changeLanguage(langCode);
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Bootstrap from persisted preference
+  const [language, setLanguageState] = useState<string>(() => {
+    // Only read localStorage on the client to avoid SSR mismatch
+    if (typeof window !== 'undefined') {
+      return getStoredLanguage() || 'en';
+    }
+    return 'en';
+  });
+
+  const { setTranslationLanguage } = useGoogleTranslate();
+
+  const setLanguage = useCallback((langCode: string) => {
     setLanguageState(langCode);
-    
-    // 2. Update localStorage (if i18next doesn't)
-    localStorage.setItem('i18nextLng', langCode);
-    
-    // 3. Update HTML lang for accessibility
-    document.documentElement.lang = langCode;
-    
-    // 4. Update RTL if necessary
+
+    // Apply RTL for Urdu
     if (langCode === 'ur') {
       document.documentElement.dir = 'rtl';
     } else {
       document.documentElement.dir = 'ltr';
     }
-    
-    // 5. Update Google Translate Widget
-    const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-    if (select) {
-      select.value = langCode;
-      select.dispatchEvent(new Event('change'));
-    }
-  };
 
+    // Update html lang attr
+    document.documentElement.lang = langCode;
+
+    // Drive Google Translate
+    setTranslationLanguage(langCode);
+  }, [setTranslationLanguage]);
+
+  // Sync html attrs on initial mount when restoring a persisted language
   useEffect(() => {
-    // Initialize HTML lang and dir on mount
-    document.documentElement.lang = language;
-    document.documentElement.dir = language === 'ur' ? 'rtl' : 'ltr';
-    
-    // Try to sync with Google translate if it loads late
-    const timer = setTimeout(() => {
-        const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-        if (select && select.value !== language) {
-          select.value = language;
-          select.dispatchEvent(new Event('change'));
-        }
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [language]);
+    if (language && language !== 'en') {
+      document.documentElement.lang = language;
+      document.documentElement.dir = language === 'ur' ? 'rtl' : 'ltr';
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const currentLangOption = availableLanguages.find(l => l.code === language) ?? availableLanguages[0];
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, availableLanguages }}>
+    <LanguageContext.Provider
+      value={{
+        language,
+        speechLanguage: currentLangOption.speechCode,
+        setLanguage,
+        availableLanguages,
+      }}
+    >
       {children}
     </LanguageContext.Provider>
   );
 };
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return (
-    <I18nextProvider i18n={i18nInstance}>
-      <LanguageProviderInner>
-        {children}
-      </LanguageProviderInner>
-    </I18nextProvider>
-  );
-};
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useLanguage = () => {
   const context = useContext(LanguageContext);

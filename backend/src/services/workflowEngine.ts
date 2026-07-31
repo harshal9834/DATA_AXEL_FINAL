@@ -1,4 +1,5 @@
 import { prisma, io } from '../server';
+import { onWorkflowCompleted, onWorkflowFailed } from './eventTracking';
 import { ResearchAgent } from './agents/researchAgent';
 import { InnovationAgent } from './agents/innovationAgent';
 import { ArchitectureAgent } from './agents/architectureAgent';
@@ -242,10 +243,15 @@ export async function startWorkflow(workflowId: string, resumeFromAgent?: string
           data: { status: 'FAILED', error: err.message, completedAt: new Date() },
         });
         io.emit('agent_failed', { id: agent.id, name: agentName, error: err.message });
-
         await prisma.workflow.update({ where: { id: workflowId }, data: { status: 'FAILED' } });
         io.emit('workflow_failed', { id: workflowId, error: err.message });
         await emitLog(workflowId, agentName, `${agentName} failed: ${err.message}`, 'red');
+        
+        // Trigger failure tracking if it exists
+        if (typeof onWorkflowFailed !== 'undefined') {
+          await onWorkflowFailed(workflowId, err.message);
+        }
+        
         return;
       }
     }
@@ -255,9 +261,14 @@ export async function startWorkflow(workflowId: string, resumeFromAgent?: string
       where: { id: workflowId },
       data: { status: 'COMPLETED', overallProgress: 100, currentAgent: null },
     });
-    io.emit('workflow_completed', { id: workflowId });
+    io.emit('workflow_completed', { id: workflowId, status: 'COMPLETED', overallProgress: 100 });
     await emitLog(workflowId, 'System', 'All agents completed. Workflow finished.', 'green');
     console.log(`[WorkflowEngine] Completed: ${workflowId}`);
+    
+    // Trigger analytics update
+    if (typeof onWorkflowCompleted !== 'undefined') {
+      await onWorkflowCompleted(workflowId, workflow.userId);
+    }
 
   } catch (err: any) {
     console.error('[WorkflowEngine] Fatal:', err.message);

@@ -1,330 +1,412 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
-  Layers, BookOpen, Library, Sparkles, FileText, TrendingUp,
-  Sparkle, Trophy, Zap, ArrowRight, CheckCircle2, Circle,
+  Layers, Sparkles, Activity, Target, ShieldAlert,
+  Clock, Plus, CheckCircle2, Play,
+  Trophy, TrendingUp, Zap, FileText, Bot, Paperclip, Mic, ArrowRight
 } from "lucide-react";
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
-import { projects, stats, researchStages, suggestions } from "../lib/demo-data";
-import { useAuth } from "../hooks/useAuth";
-import { useState } from "react";
-import { Mic, Loader2, Rocket } from "lucide-react";
+import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
+import { useState, useEffect } from "react";
 import { auth } from "../firebase/firebase";
-import { toast } from "sonner";
-import { useNavigate } from "@tanstack/react-router";
 import { BACKEND_URL } from "../lib/api";
+import io, { Socket } from "socket.io-client";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useMinimalSummary,
+  useMinimalIntelligence,
+  useMinimalAnalytics,
+  useMinimalProjects,
+  useMinimalActivity
+} from "../hooks/useMinimalDashboard";
+import { AIHeroInput } from "../components/AIHeroInput";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — AI Research Copilot" },
-      { name: "description", content: "Your executive AI research dashboard." },
-      { property: "og:title", content: "Dashboard — AI Research Copilot" },
-      { property: "og:description", content: "Search less. Solve more." },
+      { title: "Dashboard — Premium AI Copilot" },
+      { name: "description", content: "Next-gen AI Operating System." },
     ],
   }),
-  component: Dashboard,
+  component: VibrantDashboard,
 });
 
-const icons: Record<string, React.ComponentType<{ className?: string }>> = {
-  layers: Layers, "book-open": BookOpen, library: Library, sparkles: Sparkles,
-  "file-text": FileText, "trending-up": TrendingUp,
-};
+const PIE_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899'];
 
-const gradients = [
-  "from-blue-500 to-indigo-500",
-  "from-fuchsia-500 to-violet-500",
-  "from-cyan-500 to-sky-500",
-  "from-amber-500 to-orange-500",
-  "from-emerald-500 to-teal-500",
-  "from-rose-500 to-pink-500",
-];
-
-function Dashboard() {
-  const { user } = useAuth();
-  const [ideaInput, setIdeaInput] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
+function VibrantDashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [socket, setSocket] = useState<Socket | null>(null);
 
-  const handleGenerateProject = async (ideaToUse: string = ideaInput) => {
-    if (!ideaToUse.trim()) {
-      toast.error("Please enter or dictate a project idea first.");
-      return;
-    }
-    
-    setIsGenerating(true);
-    try {
+  // Queries
+  const { data: summary, isLoading: summaryLoading } = useMinimalSummary();
+  const { data: intelligence, isLoading: intelligenceLoading } = useMinimalIntelligence();
+  const { data: analytics, isLoading: analyticsLoading } = useMinimalAnalytics();
+  const { data: projects, isLoading: projectsLoading } = useMinimalProjects();
+  const { data: activity, isLoading: activityLoading } = useMinimalActivity();
+
+  // Socket IO Setup
+  useEffect(() => {
+    const fetchToken = async () => {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`${BACKEND_URL}/api/workflows`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ idea: ideaToUse })
-      });
-      const data = await res.json();
-      if (res.ok && data.workflowId) {
-        toast.success("Workflow started!");
-        navigate({ to: "/app/workflow/" + data.workflowId });
-      } else {
-        toast.error("Failed to start workflow.");
-      }
-    } catch (err) {
-      toast.error("Network error");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-  
+      if (!token) return;
+      const s = io(BACKEND_URL, { auth: { token } });
+      s.on('connect', () => console.log('Socket Connected'));
+      s.on('dashboard_update', () => queryClient.invalidateQueries({ queryKey: ['minimal'] }));
+      s.on('agent_activity', () => queryClient.invalidateQueries({ queryKey: ['minimal', 'activity'] }));
+      setSocket(s);
+    };
+    fetchToken();
+    return () => { socket?.disconnect(); };
+  }, [queryClient]);
+
   return (
-    <div className="space-y-8">
-      {/* Hero */}
-      <section className="overflow-hidden rounded-3xl border border-white/70 bg-white/70 p-8 shadow-soft backdrop-blur-xl">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-medium text-primary">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              Good Morning, Harshal
-            </div>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
-              Welcome back — <span className="text-gradient-brand">let's build something big.</span>
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              4 projects in flight • 12 new research signals • 3 hackathons open this month.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 rounded-xl border border-border/70 bg-white px-4 py-2 text-sm font-medium hover:bg-accent">
-              <Trophy className="h-4 w-4 text-amber-500" /> Innovation Score 91
-            </button>
-          </div>
-        </div>
+    <div className="mx-auto max-w-7xl space-y-10 pb-24 pt-8 px-4 sm:px-6 lg:px-8 font-sans text-slate-800 bg-slate-50/50 min-h-screen relative selection:bg-indigo-100 selection:text-indigo-900">
+      
+      {/* Decorative Background Blob */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[400px] bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 blur-3xl pointer-events-none -z-10 rounded-full" />
 
-        {/* Quick Search */}
-        <div className="mt-6">
-          <div className="text-xs font-semibold text-muted-foreground">What do you want to build today?</div>
-          <div className="relative mt-2">
-            <Sparkles className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary" />
-            <input
-              value={ideaInput}
-              onChange={(e) => setIdeaInput(e.target.value)}
-              placeholder="e.g. Build AI for Food Waste"
-              className="w-full rounded-2xl border border-border/60 bg-white py-4 pl-12 pr-4 text-base outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 md:pr-72"
-            />
-            <div className="absolute right-2 top-1/2 hidden -translate-y-1/2 gap-2 md:flex">
-              <Link to="/app/projects" className="rounded-xl border border-border/70 bg-white px-3 py-2 text-xs font-medium hover:bg-accent">Recent Projects</Link>
-              <button 
-                onClick={() => navigate({ to: '/app/voice' })}
-                className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-white px-4 py-2 text-xs font-semibold hover:bg-accent transition-colors"
-              >
-                <Mic className="h-3.5 w-3.5 text-primary" /> Voice Assistant
-              </button>
-              <button 
-                onClick={() => handleGenerateProject()}
-                disabled={isGenerating}
-                className="flex items-center gap-1.5 rounded-xl bg-gradient-brand px-4 py-2 text-xs font-semibold text-white shadow-glow disabled:opacity-50"
-              >
-                {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />} 
-                {isGenerating ? "Starting..." : "Generate Project"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* SECTION 1: WELCOME HERO */}
+      <section className="relative group">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-700"></div>
+        <WelcomeHero lastProject={projects?.[0]} loading={projectsLoading} navigate={navigate} />
       </section>
 
-      {/* Statistics */}
-      <section className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        {stats.map((s, i) => {
-          const Icon = icons[s.icon];
-          return (
-            <motion.div
-              key={s.label}
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-              className="card-premium hover-lift p-5"
-            >
-              <div className="flex items-start justify-between">
-                <div className={`grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br ${gradients[i]} text-white`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">{s.delta}</span>
+      {/* SECTION 2: EXECUTIVE SUMMARY */}
+      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <KPICard 
+          title="Projects" count={summary?.totalProjects} loading={summaryLoading} 
+          icon={<Layers className="h-6 w-6" />} color="text-blue-600" bg="bg-blue-100" trend="+12%" 
+        />
+        <KPICard 
+          title="Active" count={summary?.activeProjects} loading={summaryLoading} 
+          icon={<Activity className="h-6 w-6" />} color="text-indigo-600" bg="bg-indigo-100" trend="On track" 
+        />
+        <KPICard 
+          title="Completed" count={summary?.completedProjects} loading={summaryLoading} 
+          icon={<CheckCircle2 className="h-6 w-6" />} color="text-emerald-500" bg="bg-emerald-100" trend="+4%" 
+        />
+        <KPICard 
+          title="AI Sessions" count={summary?.aiSessionsCount} loading={summaryLoading} 
+          icon={<Bot className="h-6 w-6" />} color="text-pink-500" bg="bg-pink-100" trend="High" 
+        />
+        <KPICard 
+          title="Drafts" count={summary?.draftProjects} loading={summaryLoading} 
+          icon={<FileText className="h-6 w-6" />} color="text-orange-500" bg="bg-orange-100" trend="Review" 
+        />
+      </section>
+
+      {/* SECTION 3: PROJECT INTELLIGENCE CENTER */}
+      <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-500 relative overflow-hidden flex flex-col justify-center">
+        <div className="absolute top-0 right-0 p-32 bg-indigo-50 rounded-full blur-3xl -z-10 -translate-y-1/2 translate-x-1/2"></div>
+        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-purple-500" /> Project Intelligence
+        </h2>
+        
+        {intelligenceLoading ? (
+          <div className="h-28 bg-slate-100 animate-pulse rounded-2xl" />
+        ) : (
+          <div className="grid gap-10 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+            
+            <div className="md:col-span-1 flex flex-col justify-center group cursor-default">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-amber-100 text-amber-600 group-hover:scale-110 transition-transform"><Trophy className="h-3.5 w-3.5" /></div> Best Project
+              </span>
+              <span className="text-xl font-bold text-slate-800 truncate leading-snug">{intelligence?.bestProject?.title || 'None'}</span>
+              <span className="text-sm font-semibold text-emerald-500 mt-1">{intelligence?.bestProject?.progress || 0}% Completed</span>
+            </div>
+
+            <div className="md:col-span-1 flex flex-col justify-center md:pl-10 pt-6 md:pt-0 group cursor-default">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-rose-100 text-rose-500 group-hover:scale-110 transition-transform"><ShieldAlert className="h-3.5 w-3.5" /></div> Needs Attention
+              </span>
+              <span className="text-xl font-bold text-slate-800 truncate leading-snug">{intelligence?.needsAttention?.title || 'None'}</span>
+              <span className="text-sm font-semibold text-rose-500 mt-1">{intelligence?.needsAttention?.issue || 'All Good'}</span>
+            </div>
+
+            <div className="md:col-span-1 flex flex-col justify-center md:pl-10 pt-6 md:pt-0 group cursor-default">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-blue-100 text-blue-600 group-hover:scale-110 transition-transform"><Target className="h-3.5 w-3.5" /></div> Next Action
+              </span>
+              <span className="text-[15px] font-bold text-slate-800 leading-snug">{intelligence?.suggestedAction}</span>
+            </div>
+
+            <div className="md:col-span-1 flex flex-col justify-center md:pl-10 pt-6 md:pt-0 group cursor-default">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600 group-hover:scale-110 transition-transform"><Activity className="h-3.5 w-3.5" /></div> Global Progress
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight leading-none mt-1">{intelligence?.overallCompletion || 0}</span>
+                <span className="text-xl font-bold text-indigo-400">%</span>
               </div>
-              <div className="mt-4 text-2xl font-extrabold tracking-tight">{s.value.toLocaleString()}</div>
-              <div className="text-xs text-muted-foreground">{s.label}</div>
-              <div className="mt-2 h-10">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={s.data.map((v, k) => ({ k, v }))}>
-                    <defs>
-                      <linearGradient id={`g-${i}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+            </div>
+
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 4: ANALYTICS */}
+      <section className="grid gap-6 md:grid-cols-2">
+        
+        <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500">
+           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+             <div className="h-2 w-2 rounded-full bg-blue-500"></div> Projects Created Over Time
+           </h3>
+           {analyticsLoading ? <div className="h-56 bg-slate-100 animate-pulse rounded-2xl" /> : (
+             <div className="h-64">
+               <ResponsiveContainer width="100%" height="100%">
+                 <AreaChart data={analytics?.projectsGrowth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                   <defs>
+                      <linearGradient id="colorGrowth" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                       </linearGradient>
-                    </defs>
-                    <Area type="monotone" dataKey="v" stroke="#2563eb" strokeWidth={2} fill={`url(#g-${i})`} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </motion.div>
-          );
-        })}
+                   </defs>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 600 }} dy={10} />
+                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 600 }} dx={-10} />
+                   <Tooltip 
+                     cursor={{ stroke: '#CBD5E1', strokeWidth: 1, strokeDasharray: '4 4' }} 
+                     contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', fontWeight: 600 }} 
+                   />
+                   <Area type="monotone" dataKey="projects" stroke="#3B82F6" strokeWidth={3} fill="url(#colorGrowth)" activeDot={{ r: 6, fill: '#2563EB', strokeWidth: 2, stroke: '#fff' }} />
+                 </AreaChart>
+               </ResponsiveContainer>
+             </div>
+           )}
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm hover:shadow-xl hover:shadow-purple-500/5 transition-all duration-500">
+           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+             <div className="h-2 w-2 rounded-full bg-purple-500"></div> Project Status Distribution
+           </h3>
+           {analyticsLoading ? <div className="h-56 bg-slate-100 animate-pulse rounded-2xl" /> : (
+             <div className="h-64">
+               <ResponsiveContainer width="100%" height="100%">
+                 <PieChart>
+                   <Pie data={analytics?.statusDistribution} cx="50%" cy="50%" innerRadius={75} outerRadius={95} paddingAngle={5} dataKey="value" stroke="none" cornerRadius={10}>
+                     {analytics?.statusDistribution?.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                   </Pie>
+                   <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 600 }} />
+                   <Legend verticalAlign="bottom" height={24} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748B', paddingTop: '10px' }} />
+                 </PieChart>
+               </ResponsiveContainer>
+             </div>
+           )}
+        </div>
+
       </section>
 
-      {/* Main Grid */}
-      <section className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Projects */}
-        <div className="lg:col-span-2">
-          <div className="mb-3 flex items-end justify-between">
-            <div>
-              <h2 className="text-lg font-bold">Recent Projects</h2>
-              <p className="text-xs text-muted-foreground">Continue where you left off.</p>
-            </div>
-            <Link to="/app/projects" className="text-xs font-semibold text-primary hover:underline">View all →</Link>
+      {/* SECTIONS 5, 6 & 7 */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        
+        {/* Section 5: Recent Projects */}
+        <section className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col hover:shadow-xl hover:shadow-slate-500/5 transition-all duration-500">
+          <div className="p-7 border-b border-slate-100 bg-slate-50/50">
+            <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <Layers className="h-4 w-4 text-slate-400" /> Recent Projects
+            </h2>
           </div>
-          <div className="space-y-3">
-            {projects.slice(0, 4).map((p) => (
-              <Link to="/app/projects/$projectId" params={{ projectId: p.id }} key={p.id}
-                className="card-premium hover-lift block p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="truncate text-sm font-bold">{p.title}</h3>
-                      <StatusBadge s={p.status} />
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                      <span>Domain: <span className="font-medium text-foreground">{p.domain}</span></span>
-                      <span>Research: <span className="font-medium text-foreground">{p.research}%</span></span>
-                      <span>Updated {p.updated}</span>
-                    </div>
+          <div className="divide-y divide-slate-50 flex-1">
+            {projectsLoading ? (
+              <div className="p-7 space-y-5">
+                {[1,2,3,4,5].map(i => <div key={i} className="h-14 bg-slate-100 animate-pulse rounded-xl" />)}
+              </div>
+            ) : projects?.length === 0 ? (
+              <div className="p-16 text-center text-slate-400 text-sm font-semibold">No projects yet.</div>
+            ) : projects?.map((p: any) => (
+              <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-slate-50 transition-all duration-300 group gap-4">
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-indigo-700 font-bold text-lg border border-indigo-200/50 group-hover:scale-110 transition-transform">
+                    {p.title.charAt(0)}
                   </div>
-                  <div className="flex gap-1.5">
-                    <button className="rounded-lg bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-white shadow-glow">Continue</button>
-                    <button className="rounded-lg border border-border/70 bg-white px-3 py-1.5 text-xs font-medium hover:bg-accent">Open</button>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-[15px] font-bold text-slate-800 truncate">{p.title}</h4>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[12px] text-slate-500 font-semibold">
+                      <span>{p.domain}</span>
+                      <span className="hidden sm:inline">•</span>
+                      <span className={`px-2 py-0.5 rounded-md ${p.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {p.status.replace('_', ' ')}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
-                    <span>Progress</span><span>{p.progress}%</span>
+                <div className="flex items-center justify-between sm:justify-end gap-6 sm:w-72">
+                  <div className="w-24 flex-shrink-0">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      <span>Progress</span>
+                      <span className="text-slate-600">{p.progress}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full group-hover:shadow-[0_0_10px_rgba(79,70,229,0.5)] transition-all" style={{width: `${p.progress}%`}}></div>
+                    </div>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <motion.div
-                      initial={{ width: 0 }} animate={{ width: `${p.progress}%` }} transition={{ duration: 1 }}
-                      className="h-full rounded-full bg-gradient-brand"
-                    />
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300">
+                     <button onClick={() => navigate({ to: '/app/workflow/' + p.id })} className="px-4 py-2 bg-slate-900 text-white text-[12px] font-bold rounded-xl hover:bg-slate-800 hover:-translate-y-0.5 transition-all shadow-md hover:shadow-lg">Continue</button>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* AI Suggestions */}
-        <aside className="space-y-4">
-          <div className="card-premium p-5">
-            <h3 className="flex items-center gap-2 text-sm font-bold">
-              <Sparkle className="h-4 w-4 text-primary" /> Today's Recommendations
-            </h3>
-            <ul className="mt-3 space-y-2">
-              {suggestions.today.map((s) => (
-                <li key={s} className="flex items-start gap-2 text-xs">
-                  <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="space-y-6 flex flex-col">
+          {/* Section 6: Quick Actions */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-500">
+            <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-slate-400" /> Quick Actions
+            </h2>
+            <div className="flex flex-col gap-3">
+              <QuickActionButton 
+                icon={<Plus className="h-4 w-4" />} 
+                title="New Project" 
+                color="from-blue-500 to-indigo-500"
+                onClick={() => navigate({ to: '/app/projects' })} 
+              />
+              <QuickActionButton 
+                icon={<Mic className="h-4 w-4" />} 
+                title="Voice Copilot" 
+                color="from-purple-500 to-pink-500"
+                onClick={() => navigate({ to: '/app/voice' })} 
+              />
+              <QuickActionButton 
+                icon={<Activity className="h-4 w-4" />} 
+                title="Deep Research" 
+                color="from-emerald-500 to-teal-500"
+                onClick={() => navigate({ to: '/app/projects' })} 
+              />
+              {projects?.[0] && (
+                <button onClick={() => navigate({ to: '/app/workflow/' + projects[0].id })} className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white hover:shadow-lg hover:shadow-slate-900/20 hover:-translate-y-0.5 transition-all duration-300 text-[14px] font-bold group mt-2 border border-slate-700/50">
+                  <span className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-white/10 backdrop-blur-sm group-hover:scale-110 transition-transform"><Play className="h-4 w-4" /></div> 
+                    Continue Last Project
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                </button>
+              )}
+            </div>
+          </section>
 
-          <div className="card-premium p-5">
-            <h3 className="flex items-center gap-2 text-sm font-bold">
-              <TrendingUp className="h-4 w-4 text-fuchsia-500" /> Trending Technologies
-            </h3>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {suggestions.trending.map((t) => (
-                <span key={t} className="rounded-lg border border-border/60 bg-white px-2 py-1 text-[11px] font-medium">{t}</span>
+          {/* Section 7: Recent Activity */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm flex-1 hover:shadow-xl hover:shadow-pink-500/5 transition-all duration-500">
+            <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-slate-400" /> Recent Activity
+            </h2>
+            <div className="space-y-6 relative before:absolute before:inset-0 before:ml-[11px] before:h-full before:w-[2px] before:bg-slate-100">
+              {activityLoading ? (
+                <div className="pl-9 space-y-6">
+                  {[1,2,3].map(i => <div key={i} className="h-10 bg-slate-50 animate-pulse rounded-xl" />)}
+                </div>
+              ) : activity?.length === 0 ? (
+                <div className="pl-9 text-[14px] text-slate-500 font-semibold">No recent activity.</div>
+              ) : activity?.map((log: any, index: number) => (
+                <div key={log.id} className="relative pl-9 group">
+                  <div className="absolute left-0 top-1 h-6 w-6 rounded-full border-2 border-white bg-slate-100 group-hover:bg-indigo-500 group-hover:scale-125 group-hover:shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-300 flex items-center justify-center">
+                    <div className="h-2 w-2 rounded-full bg-white hidden group-hover:block" />
+                  </div>
+                  <div className="text-[14px] font-bold text-slate-800 leading-snug group-hover:text-indigo-600 transition-colors">{log.title}</div>
+                  <div className="flex items-center gap-2 mt-1 text-[12px] text-slate-500 font-semibold">
+                    <span className="truncate max-w-[180px] bg-slate-100 px-2 py-0.5 rounded-md">{log.project}</span>
+                    <span>•</span>
+                    <span className="text-slate-400">{new Date(log.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-
-          <div className="card-premium p-5">
-            <h3 className="flex items-center gap-2 text-sm font-bold">
-              <BookOpen className="h-4 w-4 text-cyan-500" /> Latest Research
-            </h3>
-            <ul className="mt-3 space-y-2 text-xs">
-              {suggestions.research.map((r) => <li key={r} className="text-muted-foreground">• {r}</li>)}
-            </ul>
-          </div>
-
-          <div className="card-premium p-5">
-            <h3 className="flex items-center gap-2 text-sm font-bold">
-              <Trophy className="h-4 w-4 text-amber-500" /> Hackathon Opportunities
-            </h3>
-            <ul className="mt-3 space-y-2">
-              {suggestions.hackathons.map((h) => (
-                <li key={h.name} className="flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-medium">{h.name}</div>
-                    <div className="text-[11px] text-muted-foreground">{h.date}</div>
-                  </div>
-                  <span className="rounded-full bg-gradient-to-r from-amber-500/10 to-rose-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-600">{h.prize}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-      </section>
-
-      {/* Research Progress Timeline */}
-      <section className="card-premium p-6">
-        <div className="mb-5 flex items-end justify-between">
-          <div>
-            <h2 className="text-lg font-bold">Research Progress</h2>
-            <p className="text-xs text-muted-foreground">AI for Food Waste Reduction — end-to-end pipeline</p>
-          </div>
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">3/8 stages complete</span>
+          </section>
         </div>
-        <div className="relative">
-          <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-border md:left-1/2 md:-translate-x-1/2" />
-          <div className="space-y-4">
-            {researchStages.map((s, i) => {
-              const Icon = s.status === "done" ? CheckCircle2 : s.status === "active" ? Loader2 : Circle;
-              const color = s.status === "done" ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
-                          : s.status === "active" ? "text-primary bg-primary/10 border-primary/20"
-                          : "text-muted-foreground bg-muted border-border";
-              return (
-                <motion.div
-                  key={s.key}
-                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                  className={`relative flex items-center gap-4 md:justify-${i % 2 ? "end" : "start"} md:pr-0`}
-                >
-                  <div className={`flex items-center gap-3 rounded-xl border bg-white p-3 shadow-soft md:w-[46%] ${i % 2 ? "md:mr-auto" : ""}`}>
-                    <div className={`grid h-9 w-9 place-items-center rounded-lg border ${color}`}>
-                      <Icon className={`h-4 w-4 ${s.status === "active" ? "animate-spin" : ""}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold">{s.label}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {s.status === "done" ? "Completed" : s.status === "active" ? "In progress" : "Pending"}
-                      </div>
-                    </div>
-                    {s.status === "done" && (
-                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">✓ Done</span>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+
+      </div>
+
     </div>
   );
 }
 
-function StatusBadge({ s }: { s: string }) {
-  const map: Record<string, string> = {
-    "In Progress": "bg-blue-500/10 text-blue-600",
-    "Research": "bg-fuchsia-500/10 text-fuchsia-600",
-    "Architecture": "bg-cyan-500/10 text-cyan-600",
-    "Completed": "bg-emerald-500/10 text-emerald-600",
-  };
-  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${map[s]}`}>{s}</span>;
+function QuickActionButton({ icon, title, color, onClick }: { icon: React.ReactNode, title: string, color: string, onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 hover:border-transparent hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 text-[14px] font-bold text-slate-700 group bg-white relative overflow-hidden">
+      <div className={`absolute inset-0 bg-gradient-to-r ${color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>
+      <span className="flex items-center gap-3 relative z-10">
+        <div className={`p-2 rounded-xl bg-gradient-to-br ${color} text-white shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
+          {icon}
+        </div> 
+        {title}
+      </span>
+      <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-800 group-hover:translate-x-1 transition-all relative z-10" />
+    </button>
+  );
+}
+
+function KPICard({ title, count, loading, icon, color, bg, trend }: { title: string, count: number | undefined, loading: boolean, icon: React.ReactNode, color: string, bg: string, trend: string }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:shadow-xl hover:-translate-y-1 transition-all duration-500 cursor-default group relative overflow-hidden">
+      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-transparent to-${color.split('-')[1]}-500 opacity-0 group-hover:opacity-5 rounded-bl-full transition-opacity duration-500`}></div>
+      <div className="flex justify-between items-start mb-6 relative z-10">
+        <div className={`p-3 rounded-2xl ${bg} ${color} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500 shadow-sm`}>{icon}</div>
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{title}</span>
+      </div>
+      <div className="relative z-10">
+        {loading ? (
+          <div className="h-10 w-20 bg-slate-100 animate-pulse rounded-xl" />
+        ) : (
+          <div className="flex items-end justify-between">
+            <div className="text-3xl font-black tracking-tight text-slate-800">{count || 0}</div>
+            <div className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">{trend}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const MOTIVATIONS = [
+  "Ready to build something amazing today?",
+  "Let's continue turning your ideas into reality.",
+  "Your AI Copilot is ready to help you build faster.",
+  "Every great product starts with one idea. Let's continue yours.",
+  "Welcome back! Your projects are waiting."
+];
+
+function WelcomeHero({ lastProject, loading, navigate }: { lastProject: any, loading: boolean, navigate: any }) {
+  const [greeting, setGreeting] = useState("Good Day");
+  const [motivation, setMotivation] = useState(MOTIVATIONS[0]);
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Good Morning");
+    else if (hour < 18) setGreeting("Good Afternoon");
+    else setGreeting("Good Evening");
+    setMotivation(MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)]);
+  }, []);
+
+  const userName = auth.currentUser?.displayName?.split(' ')[0] || "Builder";
+
+  return (
+    <div className="rounded-3xl border border-white/50 bg-white/70 backdrop-blur-xl px-10 pt-14 pb-10 shadow-lg shadow-indigo-500/5 relative overflow-hidden flex flex-col justify-center items-center text-center w-full min-h-[420px]">
+
+      {/* Decorative Glow */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/4" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl pointer-events-none translate-y-1/2 -translate-x-1/4" />
+
+      <div className="space-y-8 relative z-10 w-full max-w-4xl flex flex-col items-center">
+
+        {/* Greeting */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center justify-center gap-2 mb-5 px-3 py-1.5 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-700 text-[11px] font-bold uppercase tracking-wider w-max shadow-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            AI Copilot Ready
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-800 mb-3">
+            {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">{userName}</span>
+          </h1>
+          <p className="text-[16px] font-semibold text-slate-500 max-w-xl">{motivation}</p>
+        </div>
+
+        {/* Universal AI Input */}
+        <AIHeroInput />
+
+      </div>
+    </div>
+  );
 }

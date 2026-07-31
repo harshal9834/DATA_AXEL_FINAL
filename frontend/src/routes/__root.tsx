@@ -91,20 +91,24 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
-        <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
-        <script dangerouslySetInnerHTML={{ __html: `
-          function googleTranslateElementInit() {
-            new google.translate.TranslateElement({ 
-              pageLanguage: 'en', 
-              includedLanguages: 'en,hi,mr,gu,pa,ta,te,kn,ml,bn,ur,or', 
-              autoDisplay: false 
-            }, 'google_translate_element');
-          }
-        `}} />
       </head>
       <body>
         {children}
-        <div id="google_translate_element" style={{ display: 'none' }}></div>
+        {/* Google Translate hidden widget container — loaded lazily by useGoogleTranslate hook */}
+        <div
+          id="google_translate_element"
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            width: 0,
+            height: 0,
+            overflow: 'hidden',
+            opacity: 0,
+            top: -9999,
+            left: -9999,
+            pointerEvents: 'none',
+          }}
+        />
         <Scripts />
       </body>
     </html>

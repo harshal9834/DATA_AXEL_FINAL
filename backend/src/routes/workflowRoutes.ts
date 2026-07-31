@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../server';
 import { startWorkflow, retryWorkflowAgent } from '../services/workflowEngine';
 import { verifyFirebaseToken, AuthRequest } from '../middleware/verifyFirebaseToken';
+import { calculateUserMetrics, generateRecommendations } from '../services/dashboardService';
 
 const router = Router();
 
@@ -48,6 +49,9 @@ router.post(['/', '/start'], async (req: AuthRequest, res) => {
     }
 
     console.log("Workflow Created");
+    
+    // Generate initial recommendations
+    await generateRecommendations(userId);
     
     // Start engine in background
     startWorkflow(workflow.id);

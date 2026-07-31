@@ -34,6 +34,8 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import { languageMiddleware } from './middleware/languageMiddleware';
+import { translateError } from './utils/errorTranslator';
 
 process.on('uncaughtException', (err) => {
   console.error('\n[FATAL] uncaughtException:', err.stack || err);
@@ -70,7 +72,7 @@ export const io = new Server(httpServer, {
   pingTimeout: 60000,
   pingInterval: 25000,
   cors: {
-    origin: ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
+    origin: ["http://localhost:3000", "http://localhost:3002", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:3002", "http://127.0.0.1:5173"],
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -80,6 +82,7 @@ console.log('[DEBUG] Socket Ready');
 
 app.use(cors());
 app.use(express.json());
+app.use(languageMiddleware);
 
 // Detailed Request Logging Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -96,7 +99,31 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+import { adminAuth } from './firebase/firebase-admin';
+
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      return next(new Error('Authentication error'));
+    }
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const user = await prisma.user.findUnique({ where: { firebase_uid: decodedToken.uid } });
+    if (!user) {
+      return next(new Error('User not found'));
+    }
+    socket.data.userId = user.id;
+    next();
+  } catch (err) {
+    next(new Error('Authentication error'));
+  }
+});
+
 io.on('connection', (socket) => {
+  console.log('A client connected:', socket.id, 'User:', socket.data.userId);
+  if (socket.data.userId) {
+    socket.join(socket.data.userId);
+  }
   console.log('A client connected:', socket.id);
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -113,6 +140,13 @@ import workflowRoutes from './routes/workflowRoutes';
 import workspaceRoutes from './routes/workspaceRoutes';
 import smartAlertRoutes from './routes/smartAlertRoutes';
 import documentRoutes from './routes/documentRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
+import resourcesRoutes from './routes/resourcesRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
+import analyticsAdvancedRoutes from './routes/analyticsAdvancedRoutes';
+import researchWorkspaceRoutes from './routes/researchWorkspaceRoutes';
+import projectRoutes from './routes/projectRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -130,12 +164,31 @@ app.use('/api/workflow', workflowRoutes);
 app.use('/api/workspace', workspaceRoutes);
 app.use('/api/smart-alerts', smartAlertRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/resources', resourcesRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/analytics-advanced', analyticsAdvancedRoutes);
+app.use('/api/research-workspace', researchWorkspaceRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Global Error Handler
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('\n[Exception] Unhandled error caught in global handler:');
   console.error(err.stack || err);
-  res.status(500).json({ success: false, message: 'Internal Server Error', stack: err.stack });
+  
+  const rawMessage = err.message || 'Internal Server Error';
+  const locale = req.locale || 'en';
+  
+  // Do not block the event loop for translation if possible, or await it
+  const translatedMessage = await translateError(rawMessage, locale);
+  
+  res.status(500).json({ 
+    success: false, 
+    message: translatedMessage, 
+    originalMessage: rawMessage, // always good to have for dev debugging
+    stack: err.stack 
+  });
 });
 
 httpServer.listen(port, () => {

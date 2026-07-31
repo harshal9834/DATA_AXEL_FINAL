@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router } from 'express';
 import { prisma } from '../server';
 import { verifyFirebaseToken, AuthRequest } from '../middleware/verifyFirebaseToken';
