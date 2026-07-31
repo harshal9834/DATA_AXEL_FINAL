@@ -1,4 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import os
+
+FILE_PATH = r"c:\Users\Kunal\OneDrive\Desktop\Data_axle_logiloop\DATA_AXEL_FINAL\src\routes\app.docs.tsx"
+
+CONTENT = """import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Presentation, FileText, Download, Upload, Loader2, ChevronDown } from "lucide-react";
@@ -558,3 +562,8 @@ function DocsStudio() {
     </div>
   );
 }
+"""
+
+with open(FILE_PATH, "w", encoding="utf-8") as f:
+    f.write(CONTENT)
+print("Reverted app.docs.tsx to the original working UI design with added Architecture & Workflow.")

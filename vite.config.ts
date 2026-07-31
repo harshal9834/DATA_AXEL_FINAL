@@ -16,4 +16,7 @@ export default defineConfig({
     tailwindcss(),
     tsconfigPaths(),
   ],
+  server: {
+    port: 3003,
+  },
 });

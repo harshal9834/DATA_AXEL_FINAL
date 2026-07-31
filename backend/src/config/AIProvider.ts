@@ -78,6 +78,7 @@ async function callModel(
   model: string,
   temperature: number,
   jsonMode: boolean,
+  timeoutMs?: number
 ): Promise<string> {
   const client = getClient();
   console.log(`[AIProvider] → Request  model=${model} messages=${messages.length} temp=${temperature}`);
@@ -86,11 +87,16 @@ async function callModel(
     model,
     messages,
     temperature,
+    max_tokens: 3000,
     ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
   };
 
+  const abortController = new AbortController();
+  const timeoutId = timeoutMs ? setTimeout(() => abortController.abort(), timeoutMs) : null;
+
   try {
-    const completion = await client.chat.completions.create(params);
+    const completion = await client.chat.completions.create(params, { signal: abortController.signal as any });
+    if (timeoutId) clearTimeout(timeoutId);
     const text = completion.choices[0]?.message?.content ?? '';
     console.log(`[AIProvider] ← Response model=${model} chars=${text.length}`);
     if (!text) {
@@ -98,6 +104,11 @@ async function callModel(
     }
     return text;
   } catch (err: unknown) {
+    if (timeoutId) clearTimeout(timeoutId);
+    if ((err as any).name === 'AbortError') {
+       console.error(`[AIProvider] ❌ TIMEOUT exceeded (${timeoutMs}ms) for model ${model}`);
+       throw new Error('TIMEOUT');
+    }
     const error = err as any;
     const status = error?.status ?? error?.statusCode ?? 'unknown';
     const detail = error?.error?.message ?? error?.message ?? String(err);
@@ -121,20 +132,23 @@ async function callModel(
 
 export async function generateResponse(
   messages: ChatMessage[],
-  options: { temperature?: number; jsonMode?: boolean } = {},
+  options: { temperature?: number; jsonMode?: boolean; timeoutMs?: number } = {},
 ): Promise<AIProviderResponse> {
-  const { temperature = 0.7, jsonMode = false } = options;
+  const { temperature = 0.7, jsonMode = false, timeoutMs } = options;
 
   console.log(`[AIProvider] generateResponse() called — trying ${MODELS.length} models`);
 
   for (const model of MODELS) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const text = await callModel(messages, model, temperature, jsonMode);
+        const text = await callModel(messages, model, temperature, jsonMode, timeoutMs);
         console.log(`[AIProvider] ✅ SUCCESS model=${model} attempt=${attempt}`);
         return { text, model };
       } catch (err: unknown) {
         const error = err as any;
+        if (error.message === 'TIMEOUT') {
+           return { text: '{"status": "partial"}', model: 'timeout' }; // Fast fallback partial JSON
+        }
         const status = error?.status ?? 'unknown';
         const detail = error?.error?.message ?? error?.message ?? String(err);
         console.warn(`[AIProvider] ⚠ model=${model} attempt=${attempt} failed: HTTP ${status} — ${detail}`);

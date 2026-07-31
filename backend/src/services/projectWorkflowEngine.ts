@@ -297,8 +297,8 @@ export async function startProjectWorkflow(workflowId: string) {
       await markAgentRunning(docsAgentRec.id);
       const t = Date.now();
       const a = new DocumentationAgent();
-      const data = await a.execute({ workflowId, agentId: docsAgentRec.id, projectIdea: idea, backendData: {} as any, frontendData: {} as any });
-      await prisma.documentationResult.create({ data: { workflowId, userId: workflow.userId, content: JSON.stringify(data) } });
+      const data = await a.execute({ workflowId, agentId: docsAgentRec.id, projectIdea: idea, researchData: researchData || {} as any, innovationData: innovationData || {} as any, architectureData: architectureData || {} as any });
+      await prisma.documentationResult.upsert({ where: { workflowId }, create: { workflowId, userId: workflow.userId, content: JSON.stringify(data) }, update: { content: JSON.stringify(data) } });
       await markAgentDone(docsAgentRec.id, `${Math.round((Date.now() - t) / 1000)}s`);
       emitWorkspaceDocument(workflowId, "documentation", data);
     })(),
@@ -307,8 +307,8 @@ export async function startProjectWorkflow(workflowId: string) {
       await markAgentRunning(analysisAgentRec.id);
       const t = Date.now();
       const a = new AnalysisAgent();
-      const data = await a.execute({ workflowId, agentId: analysisAgentRec.id, projectIdea: idea, backendData: {} as any, frontendData: {} as any, documentationData: {} as any });
-      await prisma.analysisResult.create({ data: { workflowId, userId: workflow.userId, content: JSON.stringify(data) } });
+      const data = await a.execute({ workflowId, agentId: analysisAgentRec.id, projectIdea: idea, researchData: researchData || {} as any, innovationData: innovationData || {} as any, architectureData: architectureData || {} as any, documentationData: {} as any });
+      await prisma.analysisResult.upsert({ where: { workflowId }, create: { workflowId, userId: workflow.userId, content: JSON.stringify(data) }, update: { content: JSON.stringify(data) } });
       await markAgentDone(analysisAgentRec.id, `${Math.round((Date.now() - t) / 1000)}s`);
       emitWorkspaceDocument(workflowId, "analysis", data);
     })(),

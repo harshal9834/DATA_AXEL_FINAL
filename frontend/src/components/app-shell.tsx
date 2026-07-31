@@ -1,27 +1,26 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
-  LayoutDashboard, FolderKanban, Search, Network, Boxes, Library,
-  FileText, Sparkles, Settings, Bell, Sun, Command, LogOut, ChevronRight, Bot, Mic,
-} from "lucide-react";
-import { useState } from "react";
+  LayoutDashboard, FolderKanban, Search, Network, Bell, Library,
+  FileText, Sparkles, Settings, Sun, Command, LogOut, ChevronRight, Bot, Mic,
+} from "lucide-react";import { useState } from "react";
 import AIAssistantFab from "./ai-assistant-fab";
 import { useAuth } from "../hooks/useAuth";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 const nav: NavItem[] = [
-  { to: "/app", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/app/projects", label: "Projects", icon: FolderKanban },
-  { to: "/app/agents", label: "AI Agents", icon: Bot },
-  { to: "/app/deepsearch", label: "DeepSearch", icon: Search },
+  { to: "/app",           label: "Dashboard",           icon: LayoutDashboard, exact: true },
+  { to: "/app/projects",  label: "Projects",             icon: FolderKanban },
+  { to: "/app/agents",    label: "AI Agents",            icon: Bot },
+  { to: "/app/deepsearch",label: "DeepSearch",           icon: Search },
   { to: "/app/knowledge", label: "Knowledge Clustering", icon: Network },
-  { to: "/app/architecture", label: "Architecture", icon: Boxes },
-  { to: "/app/resources", label: "Resources", icon: Library },
-  { to: "/app/docs", label: "Documentation", icon: FileText },
-  { to: "/app/assistant", label: "AI Assistant", icon: Sparkles },
-  { to: "/app/voice", label: "Voice AI", icon: Mic },
-  { to: "/app/settings", label: "Settings", icon: Settings },
+  { to: "/app/architecture", label: "Smart Alerts",      icon: Bell },
+  { to: "/app/resources", label: "Resources",            icon: Library },
+  { to: "/app/docs",      label: "Documentation",        icon: FileText },
+  { to: "/app/assistant", label: "AI Assistant",         icon: Sparkles },
+  { to: "/app/voice",     label: "Voice AI",             icon: Mic },
+  { to: "/app/settings",  label: "Settings",             icon: Settings },
 ];
 
 export default function AppShell() {

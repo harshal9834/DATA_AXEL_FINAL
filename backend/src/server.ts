@@ -111,6 +111,8 @@ console.log('[DEBUG] Voice Ready');
 
 import workflowRoutes from './routes/workflowRoutes';
 import workspaceRoutes from './routes/workspaceRoutes';
+import smartAlertRoutes from './routes/smartAlertRoutes';
+import documentRoutes from './routes/documentRoutes';
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -124,7 +126,10 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/workflows', workflowRoutes);
+app.use('/api/workflow', workflowRoutes);
 app.use('/api/workspace', workspaceRoutes);
+app.use('/api/smart-alerts', smartAlertRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

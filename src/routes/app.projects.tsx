@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useMatches } from "@tanstack/react-router";
-import { Plus, Search as SearchIcon } from "lucide-react";
+import { Plus, Search as SearchIcon, Presentation } from "lucide-react";
 import { motion } from "framer-motion";
 import { projects } from "../lib/demo-data";
 import { PageHeader } from "../components/app-shell";
@@ -48,7 +48,11 @@ function ProjectsLayout() {
             <Link to="/app/projects/$projectId" params={{ projectId: p.id }} className="card-premium hover-lift block p-5">
               <div className="flex items-start justify-between">
                 <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{p.domain}</span>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">{p.status}</span>
+                <div className="flex items-center gap-2"><span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">{p.status}</span>
+                <button onClick={(e) => { e.preventDefault(); window.location.href = `/app/docs?projectId=${p.id}`; }} className="rounded-lg bg-blue-50/50 hover:bg-blue-100 text-blue-600 p-1.5 flex items-center justify-center transition-colors" title="Generate PPT & SRS">
+                  <Presentation className="h-3.5 w-3.5" />
+                </button>
+</div>
               </div>
               <h3 className="mt-3 text-base font-bold leading-snug">{p.title}</h3>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{p.description}</p>

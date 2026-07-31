@@ -56,6 +56,12 @@ model Workflow {
   memoryNodes       MemoryNode[]
   conversations     ConversationMemory[]
   projectMemory     ProjectMemoryState?
+  smartAlerts       SmartAlert[]
+  recommendations   Recommendation[]
+  researchPapers    ResearchPaper[]
+  githubRepos       GithubRepository[]
+  techSuggestions   TechnologySuggestion[]
+  projectHealth     ProjectHealth?
 }
 
 model WorkflowAgent {
@@ -242,4 +248,96 @@ model ProjectMemoryState {
   updatedAt         DateTime @updatedAt
 
   workflow          Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model SmartAlert {
+  id             String   @id @default(uuid())
+  workflowId     String
+  type           String
+  severity       String
+  title          String
+  description    String
+  recommendation String
+  action         String
+  resolved       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model Recommendation {
+  id             String   @id @default(uuid())
+  workflowId     String
+  priority       String
+  title          String
+  description    String
+  impact         String
+  actionType     String
+  isApplied      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ResearchPaper {
+  id             String   @id @default(uuid())
+  workflowId     String
+  title          String
+  authors        String
+  year           String
+  abstract       String
+  url            String
+  pdfUrl         String?
+  source         String
+  relevance      Int
+  createdAt      DateTime @default(now())
+
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model GithubRepository {
+  id             String   @id @default(uuid())
+  workflowId     String
+  name           String
+  url            String
+  stars          Int
+  language       String?
+  lastCommit     String?
+  issues         Int
+  similarity     Int
+  createdAt      DateTime @default(now())
+
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model TechnologySuggestion {
+  id             String   @id @default(uuid())
+  workflowId     String
+  name           String
+  reason         String
+  benefits       String
+  difficulty     String
+  implementation String
+  docsUrl        String?
+  createdAt      DateTime @default(now())
+
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ProjectHealth {
+  id                  String   @id @default(uuid())
+  workflowId          String   @unique
+  researchScore       Int
+  innovationScore     Int
+  architectureScore   Int
+  documentationScore  Int
+  implementationScore Int
+  securityScore       Int
+  testingScore        Int
+  deploymentScore     Int
+  performanceScore    Int
+  overallReadiness    Int
+  updatedAt           DateTime @updatedAt
+
+  workflow            Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 }

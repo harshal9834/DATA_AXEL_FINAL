@@ -8,12 +8,16 @@ const router = Router();
 // Apply middleware to all routes
 router.use(verifyFirebaseToken);
 
-router.post('/', async (req: AuthRequest, res) => {
+router.post(['/', '/start'], async (req: AuthRequest, res) => {
   try {
     const data = req.body;
     const userId = req.user.id;
     
-    console.log(`[Controller] POST /api/workflows - User: ${userId}`);
+    if (!data.idea || typeof data.idea !== 'string' || !data.idea.trim()) {
+      return res.status(400).json({ success: false, message: "Project idea cannot be empty" });
+    }
+    
+    console.log(`[Controller] POST /api/workflows/start - User: ${userId}`);
     const workflow = await prisma.workflow.create({
       data: {
         title: "Generating Title...", // Will be updated by Research Agent
@@ -208,6 +212,76 @@ router.post('/:id/modify-blueprint', async (req: AuthRequest, res) => {
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id/status', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const workflow = await prisma.workflow.findUnique({
+      where: { id: String(id) },
+      include: {
+        agents: true,
+        logs: { orderBy: { createdAt: 'desc' }, take: 50 }
+      }
+    });
+
+    if (!workflow || workflow.userId !== req.user.id) {
+      return res.status(404).json({ success: false, message: 'Workflow not found' });
+    }
+
+    res.json({
+      success: true,
+      status: workflow.status,
+      overallProgress: workflow.overallProgress,
+      currentAgent: workflow.currentAgent,
+      workflow: {
+        id: workflow.id,
+        title: workflow.title,
+        idea: workflow.idea,
+        status: workflow.status,
+        createdAt: workflow.createdAt,
+        updatedAt: workflow.updatedAt,
+      },
+      agents: workflow.agents.map(a => ({
+        name: a.name,
+        status: a.status,
+        progress: a.progress,
+        currentTask: a.currentTask,
+      })),
+      logs: workflow.logs,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/:id/result', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const workflow = await prisma.workflow.findUnique({ where: { id: String(id) } });
+
+    if (!workflow || workflow.userId !== req.user.id) {
+      return res.status(404).json({ success: false, message: 'Workflow not found' });
+    }
+
+    const research = await prisma.researchResult.findFirst({ where: { workflowId: String(id) }, orderBy: { createdAt: 'desc' } });
+    const innovation = await prisma.innovationResult.findFirst({ where: { workflowId: String(id) }, orderBy: { createdAt: 'desc' } });
+    const architecture = await prisma.architectureResult.findFirst({ where: { workflowId: String(id) }, orderBy: { createdAt: 'desc' } });
+    const documentation = await prisma.documentationResult.findFirst({ where: { workflowId: String(id) }, orderBy: { createdAt: 'desc' } });
+    const analysis = await prisma.analysisResult.findFirst({ where: { workflowId: String(id) }, orderBy: { createdAt: 'desc' } });
+
+    res.json({
+      success: true,
+      workflow: { title: workflow.title, status: workflow.status },
+      research: research ? JSON.parse(research.content) : null,
+      innovation: innovation ? JSON.parse(innovation.content) : null,
+      architecture: architecture ? JSON.parse(architecture.content) : null,
+      documentation: documentation ? JSON.parse(documentation.content) : null,
+      analysis: analysis ? JSON.parse(analysis.content) : null
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
