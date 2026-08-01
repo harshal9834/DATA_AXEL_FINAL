@@ -2,12 +2,13 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, FolderKanban, Search, Network, Boxes, Library,
-  FileText, Sparkles, Settings, Bell, Sun, Command, LogOut, ChevronRight, Bot, Mic,
+  FileText, Sparkles, Wand2, Settings, Bell, Sun, Command, LogOut, ChevronRight, Bot, Mic,
 } from "lucide-react";
 import { useState } from "react";
 import AIAssistantFab from "./ai-assistant-fab";
 import { useAuth } from "../hooks/useAuth";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import PromptBuilderModal from "./prompt-builder-modal";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 const nav: NavItem[] = [
@@ -27,6 +28,7 @@ const nav: NavItem[] = [
 export default function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [q, setQ] = useState("");
+  const [isPromptBuilderOpen, setIsPromptBuilderOpen] = useState(false);
   const { user, logout } = useAuth();
 
   return (
@@ -87,7 +89,17 @@ export default function AppShell() {
               </div>
               <span className="font-bold">Copilot</span>
             </Link>
-            <div className="relative ml-auto w-full max-w-xl">
+            
+            <button
+              title="Prompt Builder"
+              onClick={() => setIsPromptBuilderOpen(true)}
+              className="ml-auto mr-3 flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-purple-500 px-5 shadow-lg shadow-purple-500/25 transition-all duration-200 hover:scale-105 hover:shadow-purple-500/40"
+            >
+              <Wand2 className="h-5 w-5 text-white" />
+              <span className="text-sm font-semibold text-white">Prompt Builder</span>
+            </button>
+
+            <div className="relative w-full max-w-xl">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={q}
@@ -146,6 +158,10 @@ export default function AppShell() {
         </main>
       </div>
 
+      <PromptBuilderModal 
+        isOpen={isPromptBuilderOpen} 
+        onClose={() => setIsPromptBuilderOpen(false)} 
+      />
       <AIAssistantFab />
     </div>
   );

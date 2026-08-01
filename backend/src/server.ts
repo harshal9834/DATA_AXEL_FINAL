@@ -145,6 +145,8 @@ import analyticsAdvancedRoutes from './routes/analyticsAdvancedRoutes';
 import researchWorkspaceRoutes from './routes/researchWorkspaceRoutes';
 import projectRoutes from './routes/projectRoutes';
 import uploadRoutes from './routes/uploadRoutes';
+import knowledgeRoutes from './routes/knowledgeRoutes';
+import promptBuilderRoutes from './routes/promptBuilder';
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -166,6 +168,8 @@ app.use('/api/analytics-advanced', analyticsAdvancedRoutes);
 app.use('/api/research-workspace', researchWorkspaceRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/prompt-builder', promptBuilderRoutes);
 
 // Global Error Handler
 app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {

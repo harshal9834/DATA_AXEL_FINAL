@@ -29,23 +29,27 @@ const MODELS: string[] = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'meta-llama/llama-3.3-70b-instruct',
   'openrouter/free',
+  'llama-3.3-70b-versatile',
+  'llama3-70b-8192',
+  'mixtral-8x7b-32768',
 ];
 
 // ─── Client factory ───────────────────────────────────────────────────────────
 
 function createClient(): OpenAI {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY;
 
   if (!apiKey) {
-    console.error('[AIProvider] ❌ OPENROUTER_API_KEY is NOT set in environment variables!');
-    throw new Error('OPENROUTER_API_KEY is not set in environment variables.');
+    console.error('[AIProvider] ❌ API_KEY is NOT set in environment variables!');
+    throw new Error('API_KEY is not set in environment variables.');
   }
+
   const masked = apiKey.substring(0, 8) + '...' + apiKey.slice(-4);
-  console.log(`[AIProvider] ✅ OpenRouter client initialized. Key: ${masked}`);
+  console.log(`[AIProvider] ✅ AI client initialized. Key: ${masked}`);
 
   return new OpenAI({
     apiKey,
-    baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    baseURL: process.env.OPENROUTER_BASE_URL || process.env.GROQ_API_URL || 'https://openrouter.ai/api/v1',
     defaultHeaders: {
       'HTTP-Referer': 'http://localhost:3001',
       'X-Title': 'AI Research & Innovation Copilot',
@@ -75,7 +79,7 @@ async function callModel(
     model,
     messages,
     temperature,
-    max_tokens: maxTokens, // Fix: Explicit max_tokens ensures credit checks don't default to 65k tokens causing 402 errors
+    max_tokens: maxTokens,
     ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
   };
 
@@ -91,13 +95,13 @@ async function callModel(
     const error = err as any;
     const status = error?.status ?? error?.statusCode ?? 'unknown';
     const detail = error?.error?.message ?? error?.message ?? String(err);
-    const apiKey = process.env.OPENROUTER_API_KEY || 'MISSING';
+    const apiKey = process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY || 'MISSING';
     const maskedKey = apiKey.substring(0, 4) + '...' + apiKey.slice(-4);
     
     console.error(`\n=== ACTUAL RUNTIME FAILURE ===`);
     console.error(`- HTTP Status: ${status}`);
     console.error(`- Error Details: ${JSON.stringify(error?.error || error?.response?.data || detail)}`);
-    console.error(`- Selected Provider: OpenRouter`);
+    console.error(`- Selected Provider: AI Provider`);
     console.error(`- Selected Model: ${model}`);
     console.error(`- API Key Loaded (masked): ${maskedKey}`);
     console.error(`- Stack: ${error?.stack}`);
